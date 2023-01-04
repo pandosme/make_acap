@@ -1,7 +1,7 @@
 # ACAPP Config
 Demonstgrates how to manage dynamic ACAP configuration settings.  The configutation definitions and default values are in file source/html/config/settings.json.  This demo also shows how to setup a simple http node (/test) that responds with the text "Hello World".
 
-APP.c/.h creates two http enpoints.  The /app should is for a web page to get all the different settings in a single call.  /settings is there to get/set ACAP specific settings.
+APP.c/.h creates two http end points.  The /app should is for a web page to get all the different service settings in a single call.  /settings is there to get/set ACAP specific settings.
 
 ```
 GET /app
