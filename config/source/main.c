@@ -31,8 +31,8 @@ main(void) {
 	APP_Init();
 
 	//Get parameters and print in syslog
-	cJSON* app_parameters = APP_Settings();
-	char* json = cJSON_PrintUnformatted(app_parameters);
+	cJSON* settings = APP_Settings();
+	char* json = cJSON_PrintUnformatted(settings);
 	if( json ) {
 		LOG("%s\n",json);
 		free(json);
