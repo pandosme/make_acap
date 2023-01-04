@@ -16,15 +16,17 @@ If you use any of the examples as a base for your ACAP, make name changes in the
 3. source/manfiest.json: "appname": "PACKAGE_NAME"
 
 To build for a selected platform: 
+```
 docker build --build-arg ARCH=aarch64 --tag acap .
 docker cp $(docker create acap):/opt/app ./build
-
+```
 or 
-
+```
 docker build --build-arg ARCH=armv7hf --tag acap .
 docker cp $(docker create acap):/opt/app ./build
-
+```
 There is a simplified script that builds both platforms, extracts the EAP-files and removes the build directory.
+```
 . makeall.sh
-
+```
 
