@@ -16,7 +16,7 @@ If you use any of the examples as a base for your ACAP, make name changes in the
 2. source/APP.h: APP_PACKAGE "PACKAGE_NAME"
 3. source/manfiest.json: "appname": "PACKAGE_NAME"
 
-To build, go inte each directory.  For a selected platform... 
+To build, go into each directory.  For a selected platform... 
 ```
 docker build --build-arg ARCH=aarch64 --tag acap .
 docker cp $(docker create acap):/opt/app ./build
