@@ -19,7 +19,7 @@ static GMainLoop *main_loop = NULL;
 
 static void
 MAIN_http_test(const HTTP_Response response,const HTTP_Request request) {
-	HTTP_Respond_Text( response, "OK" );
+	HTTP_Respond_Text( response, "Hello World" );
 }
 
 int 
@@ -31,8 +31,8 @@ main(void) {
 	APP_Init();
 
 	//Get parameters and print in syslog
-	cJSON* app_parameters = APP_Settings();
-	char* json = cJSON_PrintUnformatted(app_parameters);
+	cJSON* settings = APP_Settings();
+	char* json = cJSON_PrintUnformatted(settings);
 	if( json ) {
 		LOG("%s\n",json);
 		free(json);
