@@ -1,0 +1,5 @@
+{
+	"someString":"A string",
+	"someNumber": 1,
+	"someBool": true
+}
