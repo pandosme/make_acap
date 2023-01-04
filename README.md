@@ -5,7 +5,7 @@ More information about ACAP SDK development can be found on [Axis Developer Comm
 All examples use simplified abstraction layers for common ACAP SDK services such as events, image capture, http, configuration and motion analytics data.  This lets you focus on what you want to create without the need to dig into the SDK.  You only need to focus on the main.c file.  Note that abstraction layer source files are in CAPITAL letters. All examples use cJSON to store and pass data.  All examples have a user interfaces to test/validate functionality using a web browser.
 
 Examples ACAP
-* Config - How to define and store dynamic configuration parameters without using the camera parameter handler.
+* Config - How to define and store dynamic configuration settings.
 * Image - How to capture an image and respond a JPEG file through http GET.
 * Events - How to define and fire various events (event, state and data)
 * MQTT - How to send MQTT messages using [SIMQTT](https://pandosme.github.io/acap/mqtt/component/2021/10/18/simqtt.html) as a message proxy.  SIMQTT needs to be installed and connected to a broker.
