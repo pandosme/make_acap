@@ -1,5 +1,6 @@
 # make_acap
-A collection of demo ACAP that utilize various services in Axis Cameras.  These can be used as a base for your ACAP.  More information about ACAP SDK development can be found on [Axis Developer Community](https://www.axis.com/developer-community/acap).
+A collection of demo ACAP that utilize various services in Axis Cameras.  These can be used as a base for your ACAP.  
+More information about ACAP SDK development can be found on [Axis Developer Community](https://www.axis.com/developer-community/acap).
 
 All examples use simplified abstraction layers for common ACAP SDK services such as events, image capture, http, configuration and motion analytics data.  This lets you focus on what you want to create without the need to dig into the SDK.  You only need to focus on the main.c file.  Note that abstraction layer source files are in CAPITAL letters. All examples use cJSON to store and pass data.  All examples have a user interfaces to test/validate functionality using a web browser.
 
