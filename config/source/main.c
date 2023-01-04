@@ -19,7 +19,7 @@ static GMainLoop *main_loop = NULL;
 
 static void
 MAIN_http_test(const HTTP_Response response,const HTTP_Request request) {
-	HTTP_Respond_Text( response, "OK" );
+	HTTP_Respond_Text( response, "Hello World" );
 }
 
 int 
