@@ -4,7 +4,7 @@ Example how to get Axis Motion data (MOTE) with a user interface that provides c
 Default settings for motion configuration is stored under source/html/config/mote.json.  
 
 API:
-GET /app		All app data
-GET /settings	App specific settings
-GET /mote		Motion configuration
-GET /last5		Last 5 motion detections 
+* GET /app		All app data
+* GET /settings	App specific settings
+* GET /mote		Motion configuration
+* GET /last5		Last 5 motion detections 
