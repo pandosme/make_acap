@@ -25,16 +25,23 @@ cJSON* last5 = 0;
 
 void
 MoteData( double timestamp, cJSON* list) {
-
-	// list includes bounding boxes for detections at this timestamp.
-
-	char* json = cJSON_PrintUnformatted( list );
-	if( json ) {
-		LOG_TRACE("%s\n",json);
-		free(json);
-	}
+	/* list includes bounding boxes for detections at this timestamp.
+		[
+			{
+				"id": Unique object ID,
+				"x": 0-1000,
+				"y": 0-1000,
+				"w": 0-1000,
+				"h": 0-1000,
+				"cx": 0-1000,  Center of gravity.  Placement depends on configuration
+				"cy": 0-1000   Either in the center of the box or bottom-middle (default)
+			},
+			...
+		]
+	*/
 
 	//Store the last 5 detection lists with timestamp
+	// The list is retrived with HTTP GET /last5
 	if( !last5 )
 		last5 = cJSON_CreateArray();
 	
