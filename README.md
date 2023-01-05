@@ -9,7 +9,7 @@ Examples ACAP
 * Image - How to capture an image and respond a JPEG file through http GET.
 * Events - How to define and fire various events (event, state and data)
 * MQTT - How to send MQTT messages using [SIMQTT](https://api.aintegration.team/acap/simqtt?source=acapp) as a message proxy.  SIMQTT needs to be installed and connected to a broker.
-* Motion - How to get motion data bounding-boxes sent on MQTT (via SIMQTT)
+* Motion - How to access motion data bounding-boxes.
 
 If you use any of the examples as a base for your ACAP, make name changes in the following places
 1. source/Makefile:  PROG = PACKAGE_NAME

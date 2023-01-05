@@ -51,8 +51,6 @@ main(void) {
 	
 	FILE_Init( APP_PACKAGE );
 	HTTP_Init( APP_PACKAGE );
-//	DEVICE_Init( APP_PACKAGE );
-//	STATUS_Init( APP_PACKAGE );
 	APP_Init();
 
 	HTTP_Node( "publish", MAIN_http_publish );	
