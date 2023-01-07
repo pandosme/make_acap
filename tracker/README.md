@@ -11,7 +11,7 @@ The tracker data includes the following properties
 {
 	"id": number,			Unique object ID,
 	"active": bool,			True = still tracking, False = Object tracking lost/dead
-	"timestamp": number,	Last position timestamp (EPOCH milli seconds)
+	"timestamp": number,		Last position timestamp (EPOCH milli seconds)
 	"birth": number,		Birth timestamp (EPOCH milli seconds)
 	"x": 0-1000,
 	"y": 0-1000,
