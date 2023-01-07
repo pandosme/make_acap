@@ -26,7 +26,7 @@ The tracker data includes the following properties
 	"dx": 0-1000,			Total delta x movement from birth ( positive = right, negative = left )
 	"dy": 0-1000,			Total delta y movement from birth ( positive = down, negative = up )
 	"distance": number,		Total percent movment of camer view.  Can be more than 100% if objects moves around
-	"age": number			Seconds between birth and death
+	"age": number			Seconds
 }
 ```
 The coordinate system is [0,0]-[1000,1000] with origo at top-left corner.   
