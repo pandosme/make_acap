@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tracker</title>
+<link rel="stylesheet" href="css/bootstrap.min.css">
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/imgareaselect-default.css">
+
+<script src="js/jquery.min.js"></script>
+<script src="js/bootstrap.min.js"></script>
+<script src="js/jquery.imgareaselect.js"></script>
+<script src="js/media-stream-player.min.js"></script>
+
+<style>
+td.value  {color: blue;}
+</style>
+
+</head>
+
+<body>
+
+	<div class="card bg-secondary text-white">
+		<h2>&nbsp;Tracker</h2>
+	</div>
+
+<div id="page-content-wrapper col-xl-4 col-lg-12 col-md-12 col-sm-12">
+	<div class="container-fluid">
+	
+		<div class="row">
+			<div id="view" style="width:800px; height:450px;">
+				<div id="canvas" style="width:100%; height:100%; position:relative">
+					<img id="snapshot" class="card-img-top" src="" alt="Image" style="width:100%; height:100%; position:absolute; top:0px; left:0px;">
+					<div id="video" style="width:100%; height:100%; position:absolute; top:0px; left:0px;"></div>
+					<canvas id="trackers" width="1000" height="1000" style="width:100%; height:100%; position:absolute; top:0px; left:0px;"></canvas>
+				</div>
+			</div>
+			<div class="card col-lg-5 bg-white text-black">
+				<div class="card-body">
+					<div class="form-group row">
+						<label for="mote_rotation" class="col-lg-2 col-md-12 col-sm-12 col-form-label">Rotation</label>
+						<div class="col-lg-2 col-md-12 col-sm-12 ">
+							<select id="mote_rotation" class="setting form-control">
+								<option value="0">0</option>
+								<option value="90">90</option>
+								<option value="180">180</option>
+								<option value="270">270</option>
+							</select>
+						</div>
+					</div>
+					<div class="form-group row">
+						<label for="mote_centerOfGravity" class="col-lg-4 col-md-12 col-sm-12 col-form-label">Center of gravity</label>
+						<div class="col-lg-4 col-md-12 col-sm-12">
+							<select id="mote_centerOfGravity" class="form-control">
+								<option value="0">Bottom-middle (feet)</option>
+								<option value="1">Center</option>
+							</select>
+						</div>
+					</div>
+					<div class="form-group row">
+						<button id="button-aoi" class="btn btn-outline-primary active">Set detection area</button>&nbsp;
+						<button id="button-size" class="btn btn-outline-primary">Set minimum size</button>&nbsp;
+						<button id="button-ignore" class="btn btn-outline-primary">Set ignore area</button>
+					</div>
+
+					<div class="form-group row">
+						<label for="mqtt_status" class="col-lg-2 col-form-label">MQTT Status</label>
+						<div class="col-lg-6 col-sm-10">
+							<input id="mqtt_status" type="text" readonly class="form-control-plaintext" value="Undefined">
+						</div>
+					</div>
+					<div class="form-group row">
+						<label for="mqtt_pretopic" class="col-lg-2 col-sm-2 col-form-label">MQTT Topic</label>
+						<div class="col-lg-3 col-sm-8">
+							<input id="settings_topic" type="text" class="form-control">
+						</div>
+					</div>
+					<br/>
+
+					<div class="form-group row">
+						<button id="save" class="btn btn-success"> Save </button>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script>
+
+var imageWidth = 800;
+var imageHeight = 450;
+var videoWidth = 640;
+var videoHeight = 360;
+var viewWidth = 800;
+var viewHeight = 450;
+var App = 0;
+
+function SetupView( device ) {
+
+	switch( device.aspect ) {
+		case '4:3':
+			viewWidth = 640;
+			viewHeight = 480;
+			videoWidth=800;videoHeight=600;
+			imageWidth=800;imageHeight=800;
+			if( App.mote.rotation === 90 || App.mote.rotation === 270 ) {
+				viewWidth = 480;
+				viewHeight = 640;
+			}
+		break;
+		case '16:9':
+			viewWidth = 800;
+			viewHeight = 450;
+			videoWidth=1280;
+			videoHeight = 720;
+			imageWidth=800;
+			imageHeight = 450;
+			if( App.mote.rotation === 90 || App.mote.rotation === 270 ) {
+				viewWidth = 450;
+				viewHeight = 800;
+			}
+		break;
+		case '1:1':
+			viewWidth = 450;
+			viewHeight = 450;
+			videoWidth=640;videoHeight = 640;
+			imageWidth=450;imageHeight = 450;
+		break;
+		case '16:10':
+			videoWidth=800;videoHeight = 500;
+			imageWidth=800;imageHeight = 500;
+			if( App.mote.rotation === 90 || App.mote.rotation === 270 ) {
+				imageWidth=500;imageHeight = 800;
+			}
+		break;
+	}
+			
+	$("#view").css("width", viewWidth + "px");
+	$("#view").css("height", viewHeight + "px");
+
+		
+	ctx = document.getElementById('trackers').getContext("2d");									
+	var src = '/axis-cgi/jpg/image.cgi?resolution='+imageWidth+'x'+imageHeight+'&compression=25&camera=1';// '/axis-cgi/mjpg/video.cgi'; //?resolution='+imageWidth+'x'+imageHeight;//+'&compression=40&fps=5';
+	$("#snapshot").attr("src",src);
+	
+	var secureConnection = "";
+	if (location.protocol === 'https:')
+		secureConnection = "secure=true"
+	var player = '<media-stream-player hostname="'+window.location.hostname+'" ' + secureConnection + '  format="RTP_H264" compression="40" audio="0" resolution="'+imageWidth+'x'+imageHeight+'" variant="basic" autoplay></media-stream-player>';				
+	$("#video").append(player);
+}
+
+function selectAOI() {
+	$("#snapshot").imgAreaSelect({
+		x1: (App.mote.area.x1 / 1000) * viewWidth,
+		y1: (App.mote.area.y1 / 1000) * viewHeight,
+		x2: (App.mote.area.x2 / 1000) * viewWidth,
+		y2: (App.mote.area.y2 / 1000) * viewHeight,
+		minHeight: 20,
+		minWidth: 20,
+		handles: true,
+		show:true,
+		instance: false,
+		onSelectEnd: function( image, area ) {
+			App.mote.area.x1 = parseInt((area.x1 / viewWidth) * 1000);
+			App.mote.area.x2 = parseInt((area.x2 / viewWidth) * 1000);
+			App.mote.area.y1 = parseInt((area.y1 / viewHeight) * 1000);
+			App.mote.area.y2 = parseInt((area.y2 / viewHeight) * 1000);
+		}
+	});
+}
+
+$("#button-aoi").click( function(){
+	if(!App.mote)
+		return;
+	if( !$("#button-aoi").hasClass("active") )
+		$("#button-aoi").addClass("active");
+	if( $("#button-size").hasClass("active") )
+		$("#button-size").removeClass("active");
+	if( $("#button-ignore").hasClass("active") )
+		$("#button-ignore").removeClass("active");
+	selectAOI();
+});
+
+$("#button-ignore").click( function(){
+	if(!App.mote)
+		return;
+
+	if( !$("#button-ignore").hasClass("active") )
+		$("#button-ignore").addClass("active");
+	if( $("#button-aoi").hasClass("active") )
+		$("#button-aoi").removeClass("active");
+	if( $("#button-size").hasClass("active") )
+		$("#button-size").removeClass("active");
+
+	$("#snapshot").imgAreaSelect({
+		x1: (App.mote.ignore.x1 / 1000) * viewWidth,
+		y1: (App.mote.ignore.y1 / 1000) * viewHeight,
+		x2: (App.mote.ignore.x2 / 1000) * viewWidth,
+		y2: (App.mote.ignore.y2 / 1000) * viewHeight,
+		minHeight: 5,
+		minWidth: 5,
+		handles: true,
+		show:true,
+		instance: false,
+		onSelectEnd: function( image, area ) {
+			App.mote.ignore.x1 = parseInt((area.x1 / viewWidth) * 1000);
+			App.mote.ignore.x2 = parseInt((area.x2 / viewWidth) * 1000);
+			App.mote.ignore.y1 = parseInt((area.y1 / viewHeight) * 1000);
+			App.mote.ignore.y2 = parseInt((area.y2 / viewHeight) * 1000);
+		}
+	});
+});
+
+$("#button-size").click( function(){
+	if(!App.mote)
+		return;
+
+	if( !$("#button-size").hasClass("active") )
+		$("#button-size").addClass("active");
+	if( $("#button-aoi").hasClass("active") )
+		$("#button-aoi").removeClass("active");
+	if( $("#button-ignore").hasClass("active") )
+		$("#button-ignore").removeClass("active");
+		
+	var width = (App.mote.width / 1000) * viewWidth;
+	var height = (App.mote.height / 1000) * viewHeight;
+	var x1 = (viewWidth / 2) - (width / 2);
+	var y1 = (viewHeight / 2) - (height / 2);
+	var x2 = x1 + width;
+	var y2 = y1 + height;
+
+	$("#snapshot").imgAreaSelect({
+		x1: x1,
+		y1: y1,
+		x2: x2,
+		y2: y2,
+		minHeight: 5,
+		minWidth: 5,
+		handles: true,
+		show:true,
+		instance: false,
+		onSelectEnd: function( image, area ) {
+			App.mote.width = parseInt(((area.x2 - area.x1) / viewWidth)*1000);
+			App.mote.height = parseInt(((area.y2 - area.y1) / viewHeight)*1000);
+		}
+	});
+});
+
+$("input").change(function(){
+	$(this).blur();
+});
+
+
+$("#mote_rotation").change(function() {
+
+	App.mote.rotation = parseInt($("#mote_rotation").val());
+
+	var url = "mote?json=" + encodeURIComponent( JSON.stringify(App.mote) );
+	$.ajax({ type: "GET", url: url, dataType: 'text',  cache: false,
+		success: function() {
+			location = location;
+		},
+		error: function( response) {
+			alert(response.statusText);
+		},
+	});
+});
+
+$("#save").click( function(){
+	App.mote.centerOfGravity = parseInt($("#mote_centerOfGravity").val());
+	App.mote.rotation = parseInt($("#mote_rotation").val());
+	var url = "mote?json=" + encodeURIComponent( JSON.stringify(App.mote) );
+	$.ajax({ type: "GET", url: url, dataType: 'text',  cache: false,
+		error: function( response) {
+			alert(response.statusText);
+		},
+	});
+
+	App.settings.topic = $("#settings_topic").val();
+	if( App.settings.topic.length < 2 ) {
+		App.settings.topic = "tracker";
+		$("#settings_topic").val(App.settings.topic);
+	}
+
+	var url = "settings?json=" + encodeURIComponent( JSON.stringify(App.settings) );
+	$.ajax({ type: "GET", url: url, dataType: 'text',  cache: false,
+		error: function( response) {
+			alert(response.statusText);
+		},
+	});
+});
+
+
+$(document).ready( function() {
+	
+	$.ajax({type: "GET",url: 'app',dataType: 'json',cache: false,success: function( data ) {
+			App = data;
+			SetupView( App.device );
+			selectAOI();
+			$("#mote_centerOfGravity").val( App.mote.centerOfGravity);
+			$("#mote_rotation").val(App.mote.rotation);
+			$("#settings_topic").val(App.settings.topic);
+		},
+		error: function( response) {
+			alert(response.statusText);
+		}
+	});
+
+	setInterval(function(){
+		var now = new Date().getTime();
+		$.ajax({type: "GET",url: 'trackers',dataType: 'json',cache: false,
+			success: function( trackers ) {
+				if(!ctx)
+					return;
+				ctx.beginPath();
+				ctx.clearRect(0, 0, 1000, 1000 );
+				ctx.stroke();
+
+				ctx.lineWidth = 3;
+				ctx.strokeStyle = '#FFFFFF';
+
+				for( var id in trackers ) {
+					ctx.beginPath();
+					ctx.rect(trackers[id].x, trackers[id].y, trackers[id].w, trackers[id].h );
+					ctx.moveTo(trackers[id].bx, trackers[id].by);
+					ctx.lineTo(trackers[id].cx, trackers[id].cy);
+					ctx.stroke();
+				}
+			}
+		});
+	}, 500);
+
+	setInterval(function(){
+		$.ajax({type: "GET",url: 'status',dataType: 'json',cache: false,
+			success: function( status ) {
+				if( status.hasOwnProperty("MQTT") )
+					$("#mqtt_status").val(status.MQTT.status);
+			}
+		});
+	}, 2000);
+
+});
+
+</script>
+</body>  
+
+</html>

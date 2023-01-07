@@ -1,0 +1,13 @@
+{
+	"connect":true,
+	"address":"",
+	"port":"1883",
+	"user":"",
+	"password":"",
+	"clientID":"",
+	"preTopic":"",
+	"tls": false,
+	"verify": false,
+	"lwt":null ,
+	"announce":null
+}
