@@ -21,8 +21,8 @@
 
 #define LOG(fmt, args...)    	{ syslog(LOG_INFO, fmt, ## args);  printf(fmt, ## args); }
 #define LOG_WARN(fmt, args...)  { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args);}
-#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args);}
-//#define LOG_TRACE(fmt, args...) {}
+//#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args);}
+#define LOG_TRACE(fmt, args...) {}
 
 /*
 typedef struct {
