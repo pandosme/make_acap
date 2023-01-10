@@ -10,6 +10,7 @@ Examples ACAP
 * Events - How to define and fire various events (event, state and data)
 * MQTT - How to send MQTT messages using [SIMQTT](https://api.aintegration.team/acap/simqtt?source=acapp) as a message proxy.  SIMQTT needs to be installed and connected to a broker.
 * Motion - How to access motion data bounding-boxes.
+* Classification - How to access object classifications
 
 If you use any of the examples as a base for your ACAP, make name changes in the following places
 1. source/Makefile:  PROG = PACKAGE_NAME
