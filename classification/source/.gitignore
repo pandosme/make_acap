@@ -1,0 +1,7 @@
+*.o
+*.old
+*.txt
+*.orig
+*.cfg
+
+
