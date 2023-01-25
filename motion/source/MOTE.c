@@ -23,8 +23,7 @@
 
 #define LOG(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args);}
 #define LOG_WARN(fmt, args...)    { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args);}
-#define LOG_ERROR(fmt, args...)    { syslog(LOG_ERR, fmt, ## args); printf(fmt, ## args); }
-//#define LOG_TRACE(fmt, args...)    { syslog(LOG_ERR, fmt, ## args); printf(fmt, ## args); }
+//#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
 #define LOG_TRACE(fmt, args...)    {}
 
 typedef struct video_scene_subscriber_st video_scene_subscriber_t;
@@ -53,7 +52,7 @@ int MOTE_COG = 0;
 int MOTE_LAST_EMPTY = 0;
 
 cJSON*
-MOTE() {
+MOTE_Settings() {
 	return MoteSettings;
 }
 
@@ -67,6 +66,7 @@ MOTE_Scene_Recived(char *scene_data, void *user_data) {
 
 	scene_t* const sceneData = scene_copy_from_area( scene_data );
 	if( sceneData == NULL ) {
+		g_free(scene_data);
 		LOG_WARN("Invalid MOTE Scene\n");
 		return;
 	}
@@ -159,11 +159,15 @@ MOTE_Scene_Recived(char *scene_data, void *user_data) {
 
 		if( !ignoreFlag )
 			cJSON_AddItemToArray(list,boundingbox);
+		else
+			cJSON_Delete(boundingbox);
+		
 		object = scene_next_object( sceneData, object);
 	}
 	scene_delete( sceneData );
 	g_free(scene_data);
 	if( MOTE_LAST_EMPTY && cJSON_GetArraySize(list) == 0 ) {
+		LOG_TRACE("%s: Empty\n",__func__);
 		cJSON_Delete( list );
 		return;
 	}
@@ -188,7 +192,7 @@ MOTE_Subscribe( MOTE_Callback callback ) {
 	if( MOTE_UserCallback )
 		return 1;
 
-	STATUS_SetBool("mote","status",0);
+	STATUS_SetString("app","mote","Disabled");
 	
 	if( (*mote_message_callback)(MOTE_Handler, MOTE_Scene_Recived) < 0 ) {
 		LOG_WARN("Could not set MOTE message arrive callback");
@@ -203,7 +207,7 @@ MOTE_Subscribe( MOTE_Callback callback ) {
 
 	MOTE_UserCallback = callback;
 	
-	STATUS_SetBool("mote","status",1);
+	STATUS_SetString("app","mote","OK");
 	return 1;
 }
 
@@ -236,7 +240,7 @@ MOTE_RefreshSetting() {
 	MOTE_width = cJSON_GetObjectItem(MoteSettings,"width")?cJSON_GetObjectItem(MoteSettings,"width")->valueint:0;
 	MOTE_height = cJSON_GetObjectItem(MoteSettings,"height")?cJSON_GetObjectItem(MoteSettings,"height")->valueint:0;
 
-	MOTE_Rotation = cJSON_GetObjectItem( MoteSettings, "rotation" )?cJSON_GetObjectItem( MoteSettings, "rotation" )->valueint:0;
+	MOTE_Rotation = cJSON_GetObjectItem( MoteSettings, "rotation" )?cJSON_GetObjectItem( MoteSettings, "rotation" )->valueint:DEVICE_Prop_Int("rotation");
 	
 	char *json = cJSON_PrintUnformatted(MoteSettings);
 	if( json ) {
@@ -253,23 +257,6 @@ MOTE_RefreshSetting() {
 }
 
 int
-MOTE_Settings( cJSON *settings ) {
-	if( !settings ) {
-		LOG_WARN("%s: Settings are null",__func__);
-		return 0;
-	}
-	cJSON* prop = settings->child;
-	while(prop) {
-		if( cJSON_GetObjectItem(MoteSettings,prop->string ) )
-			cJSON_ReplaceItemInObject(MoteSettings,prop->string,cJSON_Duplicate(prop,1) );
-		prop = prop->next;
-	}
-	FILE_Write( "localdata/mote.json", MoteSettings);
-	MOTE_RefreshSetting();
-	return 1;
-}
-
-int
 MOTE_Close() {
 	int result;
 	if( !MOTE_Handler )
@@ -281,11 +268,12 @@ MOTE_Close() {
 		return 0;
 	}
 	MOTE_Handler = 0;
-	STATUS_SetBool("mote","status",0);
+	STATUS_SetString("app","mote","Disabled");
 	return 1;
 }
 
 int MOTE_dummy_user_data = 42;  //Yes, the anser to everyting
+
 
 static void
 MOTE_HTTP(const HTTP_Response response,const HTTP_Request request) {
@@ -316,7 +304,7 @@ MOTE_HTTP(const HTTP_Response response,const HTTP_Request request) {
 
 int 
 MOTE_Init() {
-	STATUS_SetBool("mote","status",0);
+	STATUS_SetString("app","mote","Initializing");
 
 	MOTE_UserCallback = 0;
 
@@ -336,6 +324,13 @@ MOTE_Init() {
 			prop = prop->next;
 		}
 		cJSON_Delete(savedSettings);
+	}
+	cJSON* rotation = cJSON_GetObjectItem(MoteSettings,"rotation");
+	if( !rotation ) {
+		cJSON_AddNumberToObject(MoteSettings,"rotation",DEVICE_Prop_Int("rotation"));
+	} else {
+		if( rotation->type == cJSON_NULL )
+			cJSON_ReplaceItemInObject(MoteSettings,"rotation",cJSON_CreateNumber(DEVICE_Prop_Int("rotation")));
 	}
 	MOTE_RefreshSetting();
 	
@@ -395,7 +390,8 @@ MOTE_Init() {
 	if( (*mote_boundingbox)(MOTE_Handler ) < 0 ) {
 		LOG_WARN("Could not enable MOTE bounding box");
 	}
-	
+
+	STATUS_SetString("app","mote","Initialized");
 	HTTP_Node( "mote", MOTE_HTTP );
 	
 	return 1;

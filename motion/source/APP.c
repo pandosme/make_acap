@@ -36,7 +36,7 @@ APP_http_app(const HTTP_Response response,const HTTP_Request request) {
 	
 	cJSON_AddItemToObject(settings,"info", info );
 	cJSON_AddItemToObject(settings,"settings", cJSON_Duplicate(app,1));
-	cJSON_AddItemToObject(settings,"mote", cJSON_Duplicate(MOTE(),1));
+	cJSON_AddItemToObject(settings,"mote", cJSON_Duplicate(MOTE_Settings(),1));
 	cJSON_AddItemToObject(settings,"device", cJSON_Duplicate(DEVICE(),1));
 	cJSON_AddItemToObject(settings,"status", cJSON_Duplicate(STATUS(),1));
 	HTTP_Respond_JSON( response, settings );
