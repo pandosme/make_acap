@@ -32,20 +32,22 @@ MAIN_http_capture(const HTTP_Response response,const HTTP_Request request) {
 	if( param )
 		height = atoi(param);
 
-    VdoMap *vdo = vdo_map_new();
-    vdo_map_set_uint32(vdo, "format", VDO_FORMAT_JPEG);
-    vdo_map_set_uint32(vdo, "width", width);
-    vdo_map_set_uint32(vdo, "height", height);
+    VdoMap *vdoSettings = vdo_map_new();
+    vdo_map_set_uint32(vdoSettings, "format", VDO_FORMAT_JPEG);
+    vdo_map_set_uint32(vdoSettings, "width", width);
+    vdo_map_set_uint32(vdoSettings, "height", height);
+
     //take a snapshot
-    VdoBuffer* buffer = vdo_stream_snapshot(vdo, &error);
-    //error check
+    VdoBuffer* buffer = vdo_stream_snapshot(vdoSettings, &error);
+	g_clear_object(&vdoSettings);
+	
     if (error != NULL){
         LOG_WARN("%s: %s",__func__,error->message);
 		g_error_free( error );
 		HTTP_Respond_Error( response, 503, "Image capture error" );
 		return;
     }
-    //need frame to write to file based on its size
+	
     VdoFrame*  frame  = vdo_buffer_get_frame(buffer);
     if (!frame){
         LOG_WARN("%s: Image frame is empty",__func__);
