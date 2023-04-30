@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title class="acapName"></title>
+<link rel="stylesheet" href="css/bootstrap.min.css">
+<link rel="stylesheet" href="css/app.css">
+
+<script src="js/jquery.min.js"></script>
+<script src="js/bootstrap.min.js"></script>
+
+<style>
+td.value  {color: blue;}
+</style>
+
+</head>
+
+<body>
+
+<div class="card bg-secondary text-white">
+	<h2 class="acapName"></h2>
+</div>
+
+<div id="page-content-wrapper col-xl-6 col-lg-12 col-md-12 col-sm-12">
+	<div class="container-fluid">
+	
+		<div id="page-content-wrapper">
+			<div class="container-fluid">
+				<div class="card col-lg-10 bg-white text-black">
+					<div class="card-body">
+						<div class="form-group row">
+							<label for="resolution" class="col-lg-1 col-sm-12 col-form-label">Resolution</label>
+							<div class="col-lg-3">
+								<select id="resolution" name="resolution" class='form-control'></select>
+							</div>
+							<div class="col-sm-2">
+								<button id="capture" class="btn btn-primary">Capture</button>
+							</div>
+						</div>
+						<div class="col-lg-6 col-sm-6">
+							<img id="image" src="" width="100%">
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script>
+
+var App = null;
+
+$("#capture").click( function(e) {
+	var resolution = $("#resolution").val();
+	if(!resolution || resolution.length === 0)
+		resolution = "640x360";
+	var items = resolution.split("x");
+	var imageURL = "capture?width=" + items[0] + "&height=" + items[1];
+	$("#image").attr("src", imageURL);	
+});
+
+$(document).ready( function() {
+
+	$.ajax({type: "GET",url: 'app',dataType: 'json',cache: false,
+		success: function( data ) {
+			App = data;
+			$(".acapName").html(App.manifest.acapPackageConf.setup.friendlyName);
+
+			var resolutions = App.device.resolutions[App.device.aspect];
+			resolutions.forEach(function(resolution) {
+				$("#resolution").append('<option value="' + resolution + '">' + resolution + '</option>');
+			});
+		},
+		error: function( response) {
+			alert(response.statusText);
+		}
+	});
+});
+
+</script>
+</body>  
+
+</html>

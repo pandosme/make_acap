@@ -1,0 +1,32 @@
+{
+    "schemaVersion": "1.1",
+    "acapPackageConf": {
+        "setup": {
+            "friendlyName": "MQTT Publish Example",
+            "appName": "mqttpublish",
+            "vendor": "Fred Juhlin",
+            "embeddedSdkVersion": "3.0",
+            "user": {
+                "group": "sdk",
+                "username": "sdk"
+            },
+            "runMode": "once",
+            "version": "1.5.0"
+        },
+        "configuration": {
+			"settingPage": "index.html",
+			"httpConfig": [
+				{
+					"name": "app",
+					"access": "admin",
+					"type": "transferCgi"
+				},
+				{
+					"name": "publish",
+					"access": "admin",
+					"type": "transferCgi"
+				}
+			]		
+		}
+	}
+}
