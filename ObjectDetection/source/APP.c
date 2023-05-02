@@ -46,7 +46,7 @@ APP_Service(const char* service) {
 int
 APP_Register(const char* service, cJSON* serviceSettings ) {
 	LOG_TRACE("%s: %s\n",__func__,service);
-	cJSON_AddItemToObject( app, service, serviceSettings );
+	cJSON_AddItemReferenceToObject( app, service, serviceSettings );
 }
 
 static void
