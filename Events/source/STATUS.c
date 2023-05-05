@@ -129,6 +129,7 @@ STATUS_Object( const char *group, const char *name ) {
 
 void
 STATUS_SetBool( const char *group, const char *name, int state ) {
+	LOG_TRACE("%s: %s.%s=%s \n",__func__, group, name, state?"true":"false" );
 	cJSON* g = STATUS_Group(group);
 	if(!g) {
 		g = cJSON_CreateObject();
@@ -150,6 +151,7 @@ STATUS_SetBool( const char *group, const char *name, int state ) {
 
 void
 STATUS_SetNumber( const char *group, const char *name, double value ) {
+	LOG_TRACE("%s: %s.%s=%f \n",__func__, group, name, value );
 	cJSON* g = STATUS_Group(group);
 	if(!g) {
 		g = cJSON_CreateObject();
@@ -165,6 +167,7 @@ STATUS_SetNumber( const char *group, const char *name, double value ) {
 
 void
 STATUS_SetString( const char *group, const char *name, const char *string ) {
+	LOG_TRACE("%s: %s.%s=%s \n",__func__, group, name, string );
 	cJSON* g = STATUS_Group(group);
 	if(!g) {
 		g = cJSON_CreateObject();
@@ -180,6 +183,8 @@ STATUS_SetString( const char *group, const char *name, const char *string ) {
 
 void
 STATUS_SetObject( const char *group, const char *name, cJSON* data ) {
+	LOG_TRACE("%s: %s.%s\n",__func__, group, name );
+	
 	cJSON* g = STATUS_Group(group);
 	if(!g) {
 		g = cJSON_CreateObject();
@@ -188,17 +193,35 @@ STATUS_SetObject( const char *group, const char *name, cJSON* data ) {
 
 	cJSON *object = cJSON_GetObjectItem( g, name);
 	if( !object ) {
-		cJSON_AddItemToObject( g, name, data );
+		cJSON_AddItemToObject( g, name, cJSON_Duplicate(data,1) );
 		return;
 	}
-	cJSON_ReplaceItemInObject(g, name, data);
+	cJSON_ReplaceItemInObject(g, name, cJSON_Duplicate(data,1));
+}
+
+void
+STATUS_SetNull( const char *group, const char *name ) {
+	LOG_TRACE("%s: %s.%s=NULL\n",__func__, group, name );
+	
+	cJSON* g = STATUS_Group(group);
+	if(!g) {
+		g = cJSON_CreateObject();
+		cJSON_AddItemToObject(STATUS_Container, group, g);
+	}
+
+	cJSON *object = cJSON_GetObjectItem( g, name);
+	if( !object ) {
+		cJSON_AddItemToObject( g, name, cJSON_CreateNull() );
+		return;
+	}
+	cJSON_ReplaceItemInObject(g, name, cJSON_CreateNull());
 }
 
 cJSON*
 STATUS() {
-
 	if( STATUS_Container != 0 )
 		return STATUS_Container;
+	LOG_TRACE("%s:\n",__func__);
 	STATUS_Container = cJSON_CreateObject();
 	HTTP_Node( "status", STATUS_HTTP_callback );
 	return STATUS_Container;

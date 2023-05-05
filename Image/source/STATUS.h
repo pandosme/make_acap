@@ -29,6 +29,7 @@ void STATUS_SetBool( const char *group, const char *name, int state );
 void STATUS_SetNumber(  const char *group, const char *name, double value );
 void STATUS_SetString(  const char *group, const char *name, const char *string );
 void STATUS_SetObject(  const char *group, const char *name, cJSON* data );
+void STATUS_SetNull( const char *group, const char *name );
 
 #ifdef  __cplusplus
 }

@@ -17,36 +17,67 @@
 //#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
 #define LOG_TRACE(fmt, args...)    {}
 
-#define APP_PACKAGE	"ObjectCounter"
-
 cJSON* app = 0;
-cJSON* manifest = 0;
-
-
 
 APP_Callback	APP_UpdateCallback = 0;
 
 const char* APP_Package() {
+	cJSON* manifest = cJSON_GetObjectItem(app,"manifest");
+	if(!manifest) {
+		LOG_WARN("%s: invalid manifest\n",__func__);
+		return "Undefined";
+	}
 	cJSON* acapPackageConf = cJSON_GetObjectItem(manifest,"acapPackageConf");
+	if(!acapPackageConf) {
+		LOG_WARN("%s: invalid acapPackageConf\n",__func__);
+		return "Undefined";
+	}
 	cJSON* setup = cJSON_GetObjectItem(acapPackageConf,"setup");
+	if(!setup) {
+		LOG_WARN("%s: invalid setup\n",__func__);
+		return "Undefined";
+	}
 	return cJSON_GetObjectItem(setup,"appName")->valuestring;
 }
 	
 const char* APP_Name() {
+	cJSON* manifest = cJSON_GetObjectItem(app,"manifest");
+	if(!manifest) {
+		LOG_WARN("%s: invalid manifest\n",__func__);
+		return "Undefined";
+	}
 	cJSON* acapPackageConf = cJSON_GetObjectItem(manifest,"acapPackageConf");
+	if(!acapPackageConf) {
+		LOG_WARN("%s: invalid acapPackageConf\n",__func__);
+		return "Undefined";
+	}
 	cJSON* setup = cJSON_GetObjectItem(acapPackageConf,"setup");
+	if(!setup) {
+		LOG_WARN("%s: invalid setup\n",__func__);
+		return "Undefined";
+	}
 	return cJSON_GetObjectItem(setup,"friendlyName")->valuestring;
 }
 
 cJSON*
 APP_Service(const char* service) {
-	return cJSON_GetObjectItem(app, service );
+	cJSON* reqestedService = cJSON_GetObjectItem(app, service );
+	if( !reqestedService ) {
+		LOG_WARN("%s: %s is undefined\n",__func__,service);
+		return 0;
+	}
+	return reqestedService;
 }
 
 int
 APP_Register(const char* service, cJSON* serviceSettings ) {
 	LOG_TRACE("%s: %s\n",__func__,service);
-	cJSON_AddItemReferenceToObject( app, service, serviceSettings );
+	if( cJSON_GetObjectItem(app,service) ) {
+		LOG_TRACE("%s: %s already registered\n",__func__, service);
+		return 1;
+	}
+	cJSON_AddItemToObject( app, service, serviceSettings );
+	return 1;
 }
 
 static void
@@ -56,7 +87,6 @@ APP_http_app(const HTTP_Response response,const HTTP_Request request) {
 
 static void
 APP_http_settings(const HTTP_Response response,const HTTP_Request request) {
-
 	
 	const char* json = HTTP_Request_Param( request, "json");
 	if( !json )
