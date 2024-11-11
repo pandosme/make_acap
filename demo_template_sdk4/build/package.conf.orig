@@ -1,0 +1,11 @@
+PACKAGENAME="Demo"
+APPNAME="demo"
+VENDOR="Fred Juhlin"
+REQEMBDEVVERSION="3.0"
+VENDORHOMEPAGELINK='<a href="https://pandosme.github.io" target="_blank">pandosme.github.io</a>'
+STARTMODE="once"
+APPMAJORVERSION="4"
+APPMINORVERSION="0"
+APPMICROVERSION="0"
+SETTINGSPAGEFILE="index.html"
+HTTPCGIPATHS="cgi.conf"

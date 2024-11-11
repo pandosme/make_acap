@@ -1,0 +1,23 @@
+{
+    "schemaVersion": "1.7.1",
+    "acapPackageConf": {
+        "setup": {
+            "friendlyName": "Demo",
+            "appName": "demo",
+            "vendor": "Fred Juhlin",
+            "embeddedSdkVersion": "3.0",
+            "vendorUrl": "https://pandosme.github.io",
+            "runMode": "once",
+            "version": "4.0.0"
+        },
+        "configuration": {
+			"settingPage": "index.html",
+			"httpConfig": [
+				{"name": "app","access": "admin","type": "fastCgi"},
+				{"name": "settings","access": "admin","type": "fastCgi"},
+				{"name": "capture","access": "admin","type": "fastCgi"},
+				{"name": "fire","access": "admin","type": "fastCgi"}
+			]
+		}
+    }
+}

@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Demo ACAP</title>
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/app.css">
+    <script src="js/jquery.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+    <script src="js/media-stream-player.min.js"></script>
+    <style>
+        /* Responsive video panel with fixed aspect ratio */
+		.video-panel {
+			position: relative;
+			width: 40%; /* Reduced width */
+			height: 40%;
+			padding-top: calc(40% * (9 / 16)); /* Dynamically calculate height based on aspect ratio */
+			background-color: #000;
+			margin: 0 auto; /* Center the video panel */
+		}
+        .video-panel-content {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        #video {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+        /* Custom switch styling */
+        .custom-control-switch {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .custom-control-switch label {
+            margin-right: 10px;
+        }
+		
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-12">
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">
+                            Live Video - <span id="device-model"></span>
+                        </h5>
+                    </div>
+                    <div class="card-body p-0">
+                        <div class="video-panel">
+                            <div class="video-panel-content">
+                                <div id="video" style="width:100%; height:100%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Device Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row">
+                            <dt class="col-6">Serial Number</dt>
+                            <dd class="col-6" id="device-serial"></dd>
+                            
+                            <dt class="col-6">Model</dt>
+                            <dd class="col-6" id="device-model-full"></dd>
+                            
+                            <dt class="col-6">Platform</dt>
+                            <dd class="col-6" id="device-platform"></dd>
+                            
+                            <dt class="col-6">Firmware</dt>
+                            <dd class="col-6" id="device-firmware"></dd>
+                        </dl>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Snapshot</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-group">
+                            <label for="snapshot-resolution">Resolution</label>
+                            <select class="form-control" id="snapshot-resolution">
+                                <!-- Resolutions will be populated dynamically -->
+                            </select>
+                        </div>
+                        <button id="capture-snapshot" class="btn btn-primary btn-block mt-2">
+                            Capture Snapshot
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Settings</h5>
+                    </div>
+                    <div class="card-body" id="settings-form">
+                        <!-- Dynamic settings inputs will be generated here -->
+                    </div>
+                    <div class="card-footer">
+                        <button id="save-settings" class="btn btn-primary btn-block">Save Settings</button>
+                    </div>
+                </div>
+            </div>
+			
+            <div class="col-12 col-md-6 col-lg-3">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Events</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="custom-control-switch">
+                            <label for="event-state-switch">State</label>
+                            <div class="custom-control custom-switch">
+                                <input type="checkbox" class="custom-control-input" id="event-state-switch">
+                                <label class="custom-control-label" for="event-state-switch"></label>
+                            </div>
+                        </div>
+                        <button id="trigger-event" class="btn btn-primary btn-block mt-2">
+                            Trigger Event
+                        </button>
+                    </div>
+                </div>
+            </div>
+			
+        </div>
+    </div>
+
+    <script>
+        $(document).ready(function() {
+            // Global variable to store settings
+            let currentSettings = {};
+
+            // Function to generate input based on value type
+			function generateInputForSetting(key, value) {
+				let inputType = 'text';
+				let inputClass = 'form-control';
+				
+				// Determine input type based on value type
+				switch (typeof value) {
+					case 'number':
+						inputType = 'number';
+						break;
+					case 'boolean':
+						return `
+							<div class="form-group row align-items-center mb-2">
+								<label class="col-6 col-form-label">${key.charAt(0).toUpperCase() + key.slice(1)}</label>
+								<div class="col-6">
+									<div class="custom-control custom-checkbox">
+										<input type="checkbox" class="custom-control-input setting-input" 
+											   id="${key}" name="${key}" 
+											   ${value ? 'checked' : ''}>
+										<label class="custom-control-label" for="${key}"></label>
+									</div>
+								</div>
+							</div>
+						`;
+					case 'string':
+					default:
+						inputType = 'text';
+				}
+
+				return `
+					<div class="form-group row align-items-center mb-2">
+						<label for="${key}" class="col-6 col-form-label">${key.charAt(0).toUpperCase() + key.slice(1)}</label>
+						<div class="col-6">
+							<input type="${inputType}" 
+								   class="${inputClass} setting-input" 
+								   id="${key}" 
+								   name="${key}" 
+								   value="${value}">
+						</div>
+					</div>
+				`;
+			}
+
+            // Function to build settings form
+            function buildSettingsForm(settings) {
+                const settingsForm = $('#settings-form');
+                settingsForm.empty();
+
+                // Generate inputs for each setting
+                Object.entries(settings).forEach(([key, value]) => {
+                    settingsForm.append(generateInputForSetting(key, value));
+                });
+            }
+
+            // Function to collect current settings
+            function collectSettings() {
+                const settings = {};
+                $('.setting-input').each(function() {
+                    const $input = $(this);
+                    const key = $input.attr('name');
+                    let value;
+
+                    if ($input.attr('type') === 'checkbox') {
+                        value = $input.is(':checked');
+                    } else if ($input.attr('type') === 'number') {
+                        value = parseFloat($input.val());
+                    } else {
+                        value = $input.val();
+                    }
+
+                    settings[key] = value;
+                });
+
+                return settings;
+            }
+
+            // Main AJAX call
+            $.ajax({
+                type: "GET",
+                url: 'app',
+                dataType: 'json',
+                cache: false,
+                success: function(data) {
+                    // Determine aspect ratio dynamically
+                    const aspectRatio = data.device.aspect || '16:9';
+                    const [aspectWidth, aspectHeight] = aspectRatio.split(':').map(Number);
+                    
+                    // Update video panel aspect ratio
+                    $('.video-panel').css('padding-top', `${(aspectHeight / aspectWidth) * 50}%`);
+
+                    // Populate device information
+                    $('#device-serial').text(data.device.serial);
+                    $('#device-model').text(data.device.model);
+                    $('#device-model-full').text(data.device.type);
+                    $('#device-platform').text(data.device.platform);
+                    $('#device-firmware').text(data.device.firmware);
+
+                    // Populate snapshot resolution dropdown
+                    const resolutionSelect = $('#snapshot-resolution');
+                    const nativeResolutions = data.device.resolutions[aspectRatio] || [];
+                    
+                    nativeResolutions.forEach(resolution => {
+                        resolutionSelect.append(
+                            `<option value="${resolution}">${resolution}</option>`
+                        );
+                    });
+
+                    // Set default selected resolution to the camera's native resolution
+                    resolutionSelect.val(`${data.device.width}x${data.device.height}`);
+
+                    // Store current settings
+                    currentSettings = data.settings;
+
+                    // Build settings form
+                    buildSettingsForm(currentSettings);
+
+                    // Create video stream player
+                    const secureConnection = location.protocol === 'https:' ? 'secure=true' : '';
+                    const player = '<media-stream-player hostname="' + window.location.hostname + '"' + secureConnection + ' format="RTP_H264" compression="40" audio="0" resolution="' + data.device.width + 'x' + data.device.height + '" variant="basic" autoplay></media-stream-player>';
+                    $("#video").append(player);
+
+                    // Snapshot capture functionality
+                    $('#capture-snapshot').on('click', function() {
+                        const selectedResolution = $('#snapshot-resolution').val();
+                        const [width, height] = selectedResolution.split('x');
+                        
+                        // Trigger snapshot download
+                        const downloadLink = document.createElement('a');
+                        downloadLink.href = 'capture?width=' + width + '&height=' + height;
+                        downloadLink.download = `snapshot_${selectedResolution}.jpeg`;
+                        document.body.appendChild(downloadLink);
+                        downloadLink.click();
+                        document.body.removeChild(downloadLink);
+                    });
+
+                   // Event state switch
+                    $('#event-state-switch').on('change', function() {
+                        const isChecked = $(this).is(':checked');
+                        const stateValue = isChecked ? 1 : 0;
+                        
+                        // Send event state change
+                        $.ajax({
+                            type: "GET",
+                            url: 'fire?id=state&value=' + stateValue,
+                            success: function() {
+                            },
+                            error: function() {
+                                console.error('Failed to set event state');
+                                // Revert switch if request fails
+                                $('#event-state-switch').prop('checked', !isChecked);
+                            }
+                        });
+                    });
+
+                    // Trigger event button
+                    $('#trigger-event').on('click', function() {
+                        $.ajax({
+                            type: "GET",
+                            url: "fire?id=trigger",
+                            success: function() {
+                            },
+                            error: function() {
+                                console.error('Failed to trigger event');
+                            }
+                        });
+                    });
+
+
+                    // Save settings event handler
+                    $('#save-settings').on('click', function() {
+                        const newSettings = collectSettings();
+						const url = "settings?json=" + encodeURIComponent(JSON.stringify(newSettings));
+                        $.ajax({
+                            type: "GET",
+                            url: url,
+                            success: function(response) {
+                                currentSettings = newSettings;
+                            },
+                            error: function(xhr, status, error) {
+                                alert('Failed to save settings: ' + error);
+                            }
+                        });
+                    });
+                },
+                error: function(response) {
+                    alert('Failed to load device information: ' + response.statusText);
+                }
+            });
+        });
+    </script>
+</body>
+</html>

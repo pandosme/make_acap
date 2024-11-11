@@ -1,0 +1,16 @@
+[	
+	{
+		"id": "state",
+		"name": "Demo: State",
+		"state": true,
+		"show": true,
+		"data": []
+	},
+	{
+		"id": "trigger",
+		"name": "Demo: Trigger",
+		"state": false,
+		"show": true,
+		"data": []
+	}
+]
