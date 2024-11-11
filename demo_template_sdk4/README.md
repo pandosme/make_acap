@@ -19,6 +19,8 @@ This project provides a comprehensive template for developing applications using
 │   ├── ACAP.c
 │   ├── ACAP.h
 │   ├── main.c
+│   ├── cJSON.c
+│   ├── cJSON.h
 │   ├── html
 │   │   ├── config
 │   │   │   ├── events.json
