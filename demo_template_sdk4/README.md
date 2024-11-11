@@ -1,5 +1,3 @@
-I'll restructure the README to make it more comprehensive and appealing for both human developers and AI assistants working on ACAP (Axis Camera Application Platform) development.
-
 # ACAP SDK v4.0 Project Template
 
 ## Overview
