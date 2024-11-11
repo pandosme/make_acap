@@ -60,15 +60,9 @@ Demonstrates two event types:
 - Docker (recommended for compilation)
 
 ### Compilation Steps
-1. Adjust `Dockerfile` architecture:
-   ```dockerfile
-   ARG ARCH=aarch64  # Options: aarch64, arm7hf
-   ```
-
-2. Build using Docker:
-   ```bash
-   docker build -t my-acap-app .
-   ```
+```bash
+. build.sh
+```
 
 ## 💡 Key Code Highlights
 

@@ -116,7 +116,7 @@ int main(void) {
 	ACAP( APP_PACKAGE, Settings_Updated_Callback );
 	ACAP_HTTP_Node( "capture", HTTP_Endpoint_capture );
 	ACAP_HTTP_Node( "fire", HTTP_Endpoint_fire );
-	settings = ACAP_Service("settings);
+	settings = ACAP_Service("settings");
 
 	g_idle_add(ACAP_HTTP_Process, NULL);
 	main_loop = g_main_loop_new(NULL, FALSE);
