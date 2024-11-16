@@ -20,3 +20,6 @@ The standard base for majority ACAP including
 - Simple Publish and Subscribe functions
 
 # Build
+Clone Repository
+```
+git clone 
