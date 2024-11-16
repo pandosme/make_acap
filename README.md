@@ -4,7 +4,8 @@ The goal is to let you focus on the use case and not batteling the SDK API.
 
 ## Base
 The standard base for majority ACAP including
-- HTTP (based on fastgci)
+- HTTP (based on fastgci) incuding GET, POST and file transfer
+- Image capture
 - Managing ACAP configuration parameters
 - Decalreing and Fire events
 - Web Interface with video streaming capabilities
@@ -22,4 +23,20 @@ The standard base for majority ACAP including
 # Build
 Clone Repository
 ```
-git clone 
+git clone https://github.com/pandosme/make_acap.git
+```
+Select template project to work with
+```
+cd base
+```
+Compile/Build
+```
+. build.sh
+```
+Customize by updating
+- app/main.c
+- app/mainfest.json
+- Makefile
+- app/html/config/settings.json
+- app/html/config/sevents.json
+- app/html/index.html
