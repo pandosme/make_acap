@@ -15,8 +15,9 @@ The standard base for majority ACAP including
 - Simple callback to process events
 
 ## Base MQTT
-- An MQTT using the same MQTT libraries as the Axis Device MQTT client
-- Does not impact the device MQTT client
+- MQTT Client
+  * Using the same MQTT libraries as the Axis Device MQTT client
+  * Does not impact the device MQTT client
 - Simple configuration
 - Simple Publish and Subscribe functions
 
