@@ -1,6 +1,6 @@
 # Make ACAP
-Working with ACAP SDK from scratch is not simple.  These examples uses abstract layer code (ACAP.c and ACAP.h) that can be used as templates deveopling ACAP services.  Separating the code from the SDK API will also make it easier to manage future (breaking) changes.
-The goal is to let you focus on the use case and not batteling the SDK API.
+Working with ACAP SDK from scratch is not simple.  The goal is to let you focus on the use case and not batteling the SDK API.  
+The examples uses abstract layer code (ACAP.c and ACAP.h) that simplifies interaction with SDK services.  By separating your from the SDK API will make it easier to manage future (breaking) changes in the ACAP SDK.
 
 ## Base
 The standard base for majority ACAP including
