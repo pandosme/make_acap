@@ -1,4 +1,4 @@
-# ACAP SDK v4.0 Project Template
+# ACAP SDK Base Project Template
 
 ## Overview
 
