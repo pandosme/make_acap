@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/app.css">
+    <script src="js/jquery.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+</head>
+
+<body>
+    <div class="d-flex" id="wrapper">
+        <!-- Sidebar -->
+        <div class="bg-light border-right" id="sidebar-wrapper">
+            <div class="sidebar-heading"></div>
+            <div class="list-group list-group-flush">
+			<a href="index.html" class="list-group-item list-group-item-action">Video</a>
+			<a href="about.html" class="list-group-item list-group-item-action active">About</a>
+            </div>
+        </div>
+        <!-- /#sidebar-wrapper -->
+
+        <!-- Page Content -->
+        <div id="page-content-wrapper">
+            <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
+                <button class="btn btn-link" id="menu-toggle">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <span class="navbar-text" id="model_status"></span>
+            </nav>
+
+			<div class="container">
+				<div class="row">
+					<div class="col-12">
+						<br>
+						<h2>Application</h2>
+						<div class="info-grid">
+							<div class="info-row">
+								<div class="info-label">Name:</div>
+								<div class="info-value"><span id="name"></span></div>
+							</div>
+							<div class="info-row">
+								<div class="info-label">Package:</div>
+								<div class="info-value"><span id="package"></span></div>
+							</div>
+							<div class="info-row">
+								<div class="info-label">Version:</div>
+								<div class="info-value"><span id="version"></span></div>
+							</div>
+							<div class="info-row">
+								<div class="info-label">Vendor:</div>
+								<div class="info-value"><span id="vendor"></span></div>
+							</div>
+							<div class="info-row">
+								<div class="info-label">URL:</div>
+								<div class="info-value">
+									<a id="vendorLink" href="" target="_blank"><span id="url"></span></a>
+								</div>
+							</div>
+							<div class="info-row">
+								<div class="info-label">Device:</div>
+								<div class="info-value"><span id="model"></span></div>
+							</div>
+							<div class="info-row">
+								<div class="info-label">Firmware:</div>
+								<div class="info-value"><span id="firmware"></span></div>
+							</div>
+							<div class="info-row">
+								<div class="info-label">Serial:</div>
+								<div class="info-value"><span id="serial"></span></div>
+							</div>
+							<div class="info-row">
+								<div class="info-label">Chip:</div>
+								<div class="info-value"><span id="chip"></span></div>
+							</div>
+							<div class="info-row">
+								<div class="info-label">Architecture:</div>
+								<div class="info-value"><span id="arch"></span></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+        </div>
+    </div>
+
+<script>
+
+$(document).ready(function() {
+
+	$.ajax({
+		type: "GET",
+		url: 'app',
+		dataType: 'json',
+		cache: false,
+		success: function(app) {
+			// Update UI elements
+			document.title = app.manifest.acapPackageConf.setup.friendlyName;
+			$("#sidebar-wrapper .sidebar-heading").html(app.manifest.acapPackageConf.setup.friendlyName);
+			$('#name').text(app.manifest.acapPackageConf.setup.friendlyName);
+			$('#package').text(app.manifest.acapPackageConf.setup.appName);
+			$('#version').text(app.manifest.acapPackageConf.setup.version);
+			$('#vendor').text(app.manifest.acapPackageConf.setup.vendor);
+			$('#url').text(app.manifest.acapPackageConf.setup.vendorUrl);
+			$("#vendorLink").attr("href",app.manifest.acapPackageConf.setup.vendorUrl);
+		},
+		error: function(response) {
+			alert(response.statusText);
+		}
+	});
+
+	$.ajax({
+		type: "POST",
+		url: '/axis-cgi/basicdeviceinfo.cgi',
+		data:'{"apiVersion": "1.0","context": "acap","method": "getAllProperties"}',
+		contentType: 'application/json',
+		dataType: 'json',
+		cache: false,
+		success: function(basicdeviceinfo) {
+			$('#model').text(basicdeviceinfo.data.propertyList.ProdShortName);
+			$('#firmware').text(basicdeviceinfo.data.propertyList.Version);
+			$('#serial').text(basicdeviceinfo.data.propertyList.SerialNumber);
+			$('#chip').text(basicdeviceinfo.data.propertyList.Soc);
+			$('#arch').text(basicdeviceinfo.data.propertyList.Architecture);
+		},
+		error: function(response) {
+			alert(response.statusText);
+		}
+	});
+
+	// Menu toggle handler
+	$("#menu-toggle").click(function(e) {
+		e.preventDefault();
+		$("#wrapper").toggleClass("toggled");
+	});
+
+
+});	
+</script>
+</body>
+
+</html>

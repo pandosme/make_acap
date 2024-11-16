@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/app.css">
+    <script src="js/jquery.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+
+<style>
+.cert-status-container {
+    max-width: 800px;
+}
+
+.cert-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid #eee;
+}
+
+.cert-label {
+    min-width: 150px;
+    font-weight: 500;
+}
+
+.cert-status {
+    flex: 1;
+    color: #666;
+}
+
+.monospace {
+    font-family: Consolas, Monaco, 'Lucida Console', monospace;
+    font-size: 12px;
+}
+
+.modal-lg {
+    max-width: 1200px; /* Increased from default 800px */
+    width: 95%; /* Ensures some margin on smaller screens */
+}
+
+.modal .modal-body textarea {
+    width: 100%;
+    min-width: 100%;
+}
+
+
+</style>
+
+</head>
+
+<body>
+<div class="d-flex" id="wrapper">
+	<div class="bg-light border-right" id="sidebar-wrapper">
+		<div class="list-group list-group-flush">
+			<a href="index.html" class="list-group-item list-group-item-action">Video</a>
+			<a href="mqtt.html" class="list-group-item list-group-item-action active">MQTT</a>
+			<a href="test.html" class="list-group-item list-group-item-action">Test</a>
+			<a href="about.html" class="list-group-item list-group-item-action">About</a>
+		</div>
+	</div>
+	
+	<div id="page-content-wrapper" class="p-0">
+		<nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
+			<span class="acap_name"></span>			
+			<button class="btn btn-link" id="menu-toggle">
+				<i class="fas fa-bars"></i>
+			</button>
+		</nav>
+
+		<div class="col-md-12">
+			<br>
+			<div class="container">
+				<div class="row">
+					<div class="col-12">
+						<br>
+						<div class="card">
+							<div class="card-body">
+								<h3 class="card-title">TLS Certificates</h3>
+								
+								<div class="cert-status-container">
+									<div class="cert-row">
+										<div class="cert-label">Client Certificate:</div>
+										<div class="cert-status" id="certStatus">Not installed</div>
+										<button class="btn btn-primary btn-sm" data-toggle="modal" data-target="#certModal">Set</button>
+									</div>
+									
+									<div class="cert-row">
+										<div class="cert-label">Private Key:</div>
+										<div class="cert-status" id="keyStatus">Not installed</div>
+										<button class="btn btn-primary btn-sm" data-toggle="modal" data-target="#keyModal">Set</button>
+									</div>
+									
+									<div class="cert-row">
+										<div class="cert-label">CA Certificate:</div>
+										<div class="cert-status" id="caStatus">Not installed</div>
+										<button class="btn btn-primary btn-sm" data-toggle="modal" data-target="#caModal">Set</button>
+									</div>
+								</div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		<!-- Certificate Modal -->
+		<div class="modal fade" id="certModal" tabindex="-1" role="dialog">
+			<div class="modal-dialog modal-lg" role="document">
+				<div class="modal-content">
+					<div class="modal-header">
+						<h5 class="modal-title">Set Client Certificate</h5>
+						<button type="button" class="close" data-dismiss="modal">&times;</button>
+					</div>
+					<div class="modal-body">
+						<textarea id="cert" class="form-control monospace" rows="20" placeholder="Paste PEM certificate data here"></textarea>
+					</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+						<button type="button" class="btn btn-primary" id="saveCert">Save</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Key Modal -->
+		<div class="modal fade" id="keyModal" tabindex="-1" role="dialog">
+			<div class="modal-dialog modal-lg" role="document">
+				<div class="modal-content">
+					<div class="modal-header">
+						<h5 class="modal-title">Set Private Key</h5>
+						<button type="button" class="close" data-dismiss="modal">&times;</button>
+					</div>
+					<div class="modal-body">
+						<textarea id="key" class="form-control monospace" rows="20" placeholder="Paste PEM private key data here"></textarea>
+						<div class="form-group mt-3">
+							<label for="password">Password (if required)</label>
+							<input type="password" class="form-control" id="password">
+						</div>
+					</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+						<button type="button" class="btn btn-primary" id="saveKey">Save</button>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- CA Modal -->
+		<div class="modal fade" id="caModal" tabindex="-1" role="dialog">
+			<div class="modal-dialog modal-lg" role="document">
+				<div class="modal-content">
+					<div class="modal-header">
+						<h5 class="modal-title">Set CA Certificate</h5>
+						<button type="button" class="close" data-dismiss="modal">&times;</button>
+					</div>
+					<div class="modal-body">
+						<textarea id="ca" class="form-control monospace" rows="20" placeholder="Paste PEM CA certificate data here"></textarea>
+					</div>
+					<div class="modal-footer">
+						<button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+						<button type="button" class="btn btn-primary" id="saveCA">Save</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script>
+
+$(document).ready(function() {
+
+	$.ajax({
+		type: "GET",
+		url: 'app',
+		dataType: 'json',
+		cache: false,
+		success: function(app) {
+			document.title = app.manifest.acapPackageConf.setup.friendlyName;
+			$('.acap_name').text(app.manifest.acapPackageConf.setup.friendlyName);
+		},
+		error: function(response) {
+			alert(response.statusText);
+		}
+	});
+	CheckStatus();
+});
+
+// Menu toggle handler
+$("#menu-toggle").click(function(e) {
+    e.preventDefault();
+    $("#wrapper").toggleClass("toggled");
+});
+
+function CheckStatus() {
+	$.ajax({ type: "GET", url: 'certs', dataType: 'json',  cache: true,
+		success: function( certs ) {
+			if( certs.certfile ) {
+				$("#certStatus").text("Installed");
+			} else {
+				$("#certStatus").text("Not installed");
+			}
+			
+			if( certs.keyfile ) {
+				if( certs.hasOwnProperty("password") )
+					$("#keyStatus").text("Installed with password");
+				else
+					$("#keyStatus").text("Installed");
+			} else {
+				$("#keyStatus").text("Not installed");
+			}
+
+			if( certs.cafile ) {
+				$("#caStatus").text("Installed");
+			} else {
+				$("#caStatus").text("Not installed");
+			}
+		},
+		error: function( response ){
+			alert("Error " + response.responseCode + ": Check if running");
+		}
+	});
+}
+
+$("#saveCert").click(function() {
+    var data = $('#cert').val();
+    if (!validateCertificate(data)) return;
+    
+    $.ajax({
+        type: "POST",
+        url: "certs",
+        contentType: 'application/json',
+        data: JSON.stringify({
+            type: "cert",
+            pem: data
+        }),
+        success: function(response) {
+            $('#certModal').modal('hide');
+            CheckStatus();
+        },
+        error: function(response) {
+            alert("Error: " + response.responseText);
+        }
+    });
+});
+
+$("#saveKey").click(function() {
+    var data = $('#key').val();
+    var password = $('#password').val();
+    if (!validatePrivateKey(data)) return;
+    
+    var payload = {
+        type: "key",
+        pem: data
+    };
+    
+    if (password) {
+        payload.password = password;
+    }
+    
+    $.ajax({
+        type: "POST",
+        url: "certs",
+        contentType: 'application/json',
+        data: JSON.stringify(payload),
+        success: function(response) {
+            $('#keyModal').modal('hide');
+            CheckStatus();
+        },
+        error: function(response) {
+            alert("Error: " + response.responseText);
+        }
+    });
+});
+
+$("#saveCA").click(function() {
+    var data = $('#ca').val();
+    if (!validateCertificate(data)) return;
+    
+    $.ajax({
+        type: "POST",
+        url: "certs",
+        contentType: 'application/json',
+        data: JSON.stringify({
+            type: "ca",
+            pem: data
+        }),
+        success: function(response) {
+            $('#caModal').modal('hide');
+            CheckStatus();
+        },
+        error: function(response) {
+            alert("Error: " + response.responseText);
+        }
+    });
+});
+
+// Validation functions
+function validateCertificate(data) {
+    if (data.length < 100) {
+        alert("Certificate data too short");
+        return false;
+    }
+    if (data.search("-----BEGIN CERTIFICATE-----") < 0 || 
+        data.search("-----END CERTIFICATE-----") < 0) {
+        alert("Not a valid certificate PEM");
+        return false;
+    }
+    return true;
+}
+
+function validatePrivateKey(data) {
+    if (data.length < 500) {
+        alert("Key data too short");
+        return false;
+    }
+    if (data.search("-----BEGIN RSA PRIVATE KEY-----") < 0 || 
+        data.search("-----END RSA PRIVATE KEY-----") < 0) {
+        alert("Not a valid private key PEM");
+        return false;
+    }
+    return true;
+}
+
+// Clear modal contents when closed
+$('.modal').on('hidden.bs.modal', function () {
+    $(this).find('textarea').val('');
+    $(this).find('input[type="password"]').val('');
+});
+
+
+</script>
+</body>
+
+</html>

@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/app.css">
+    <script src="js/jquery.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+</head>
+<body>
+<div class="d-flex" id="wrapper">
+	<div class="bg-light border-right" id="sidebar-wrapper">
+		<div class="list-group list-group-flush">
+			<a href="index.html" class="list-group-item list-group-item-action">Video</a>
+			<a href="image.html" class="list-group-item list-group-item-action">Image</a>
+			<a href="config.html" class="list-group-item list-group-item-action active">Config</a>
+			<a href="events.html" class="list-group-item list-group-item-action">Events</a>
+			<a href="about.html" class="list-group-item list-group-item-action">About</a>
+		</div>
+	</div>
+
+	<div id="page-content-wrapper" class="p-0">
+		<nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
+			<span class="acap_name"></span>			
+			<button class="btn btn-link" id="menu-toggle">
+				<i class="fas fa-bars"></i>
+			</button>
+		</nav>
+
+		<div class="container-fluid">
+			<div class="col-12 col-md-6 col-lg-3">
+				<div class="card">
+					<div class="card-header">
+						<h5 class="card-title mb-0">Settings</h5>
+					</div>
+					<div class="card-body" id="settings-form">
+						<!-- Dynamic settings inputs will be generated here -->
+					</div>
+					<div class="card-footer">
+						<button id="save-settings" class="btn btn-primary btn-block">Save Settings</button>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</div>
+<script>
+$(document).ready(function() {
+	// Main AJAX call
+	$.ajax({
+		type: "GET",
+		url: 'app',
+		dataType: 'json',
+		cache: false,
+		success: function(data) {
+			document.title = data.manifest.acapPackageConf.setup.friendlyName;
+			$('.acap_name').text(data.manifest.acapPackageConf.setup.friendlyName);
+			
+			// Build settings form
+			buildSettingsForm(data.settings);
+
+		},
+		error: function(response) {
+			alert('Failed to load device information: ' + response.statusText);
+		}
+	});
+
+	// Save settings event handler
+	$('#save-settings').on('click', function() {
+		const newSettings = collectSettings();
+		$.ajax({
+			type: "POST",
+			url: "settings",
+			contentType: 'application/json',
+			data: JSON.stringify(newSettings),
+			success: function(response) {
+				currentSettings = newSettings;
+			},
+			error: function(xhr, status, error) {
+				alert('Failed to save settings: ' + error);
+			}
+		});
+	});
+
+	// Function to generate input based on value type
+	function generateInputForSetting(key, value) {
+		let inputType = 'text';
+		let inputClass = 'form-control';
+		
+		// Determine input type based on value type
+		switch (typeof value) {
+			case 'number':
+				inputType = 'number';
+				break;
+			case 'boolean':
+				return `
+					<div class="form-group row align-items-center mb-2">
+						<label class="col-6 col-form-label">${key.charAt(0).toUpperCase() + key.slice(1)}</label>
+						<div class="col-6">
+							<div class="custom-control custom-checkbox">
+								<input type="checkbox" class="custom-control-input setting-input" 
+									   id="${key}" name="${key}" 
+									   ${value ? 'checked' : ''}>
+								<label class="custom-control-label" for="${key}"></label>
+							</div>
+						</div>
+					</div>
+				`;
+			case 'string':
+			default:
+				inputType = 'text';
+		}
+
+		return `
+			<div class="form-group row align-items-center mb-2">
+				<label for="${key}" class="col-6 col-form-label">${key.charAt(0).toUpperCase() + key.slice(1)}</label>
+				<div class="col-6">
+					<input type="${inputType}" 
+						   class="${inputClass} setting-input" 
+						   id="${key}" 
+						   name="${key}" 
+						   value="${value}">
+				</div>
+			</div>
+		`;
+	}
+
+	// Function to build settings form
+	function buildSettingsForm(settings) {
+		const settingsForm = $('#settings-form');
+		settingsForm.empty();
+
+		// Generate inputs for each setting
+		Object.entries(settings).forEach(([key, value]) => {
+			settingsForm.append(generateInputForSetting(key, value));
+		});
+	}
+
+	// Function to collect current settings
+	function collectSettings() {
+		const settings = {};
+		$('.setting-input').each(function() {
+			const $input = $(this);
+			const key = $input.attr('name');
+			let value;
+
+			if ($input.attr('type') === 'checkbox') {
+				value = $input.is(':checked');
+			} else if ($input.attr('type') === 'number') {
+				value = parseFloat($input.val());
+			} else {
+				value = $input.val();
+			}
+
+			settings[key] = value;
+		});
+
+		return settings;
+	}
+
+});
+</script>
+</body>
+</html>

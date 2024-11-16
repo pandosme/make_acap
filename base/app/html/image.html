@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title></title>
+    <link rel="stylesheet" href="css/bootstrap.min.css">
+    <link rel="stylesheet" href="css/app.css">
+    <script src="js/jquery.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
+</head>
+<body>
+<div class="d-flex" id="wrapper">
+	<div class="bg-light border-right" id="sidebar-wrapper">
+		<div class="list-group list-group-flush">
+			<a href="index.html" class="list-group-item list-group-item-action">Video</a>
+			<a href="image.html" class="list-group-item list-group-item-action active">Image</a>
+			<a href="config.html" class="list-group-item list-group-item-action">Config</a>
+			<a href="events.html" class="list-group-item list-group-item-action">Events</a>
+			<a href="about.html" class="list-group-item list-group-item-action">About</a>
+		</div>
+	</div>
+
+	<div id="page-content-wrapper" class="p-0">
+		<nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
+			<span class="acap_name"></span>			
+			<button class="btn btn-link" id="menu-toggle">
+				<i class="fas fa-bars"></i>
+			</button>
+		</nav>
+
+		<div class="container-fluid">
+			<div class="col-12">
+				<div class="card">
+					<div class="card-header">
+						<h5 class="card-title mb-0">Image</h5>
+					</div>
+					<div class="card-body" id="settings-form">
+						<div class="row mb-3">
+							<div class="col-md-8">
+								<select class="form-control" id="snapshot-resolution"></select>
+							</div>
+							<div class="col-md-4">
+								<button id="capture-snapshot" class="btn btn-primary w-100">Capture Snapshot</button>
+							</div>
+						</div>
+						<div class="image-container" style="height: 480px;">
+							<img src="/axis-cgi/jpg/image.cgi?resolution=640x360" 
+								 alt="Image" 
+								 style="width: 100%; 
+										height: 100%; 
+										object-fit: contain;">
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+	</div>
+</div>
+<script>
+$(document).ready(function() {
+	// Main AJAX call
+	$.ajax({
+		type: "GET",
+		url: 'app',
+		dataType: 'json',
+		cache: false,
+		success: function(data) {
+			document.title = data.manifest.acapPackageConf.setup.friendlyName;
+			$('.acap_name').text(data.manifest.acapPackageConf.setup.friendlyName);
+
+			const aspectRatio = data.device.aspect || '16:9';
+			const [aspectWidth, aspectHeight] = aspectRatio.split(':').map(Number);
+
+			const resolutionSelect = $('#snapshot-resolution');
+			const nativeResolutions = data.device.resolutions[aspectRatio] || [];
+			
+			nativeResolutions.forEach(resolution => {
+				resolutionSelect.append('<option value="' + resolution + '">' + resolution + '</option>');
+			});
+		},
+		error: function(response) {
+			alert('Failed to load device information: ' + response.statusText);
+		}
+	});
+});
+
+
+$('#snapshot-resolution').on('change', function() {
+    const selectedResolution = $(this).val();
+     $('#settings-form img').attr('src', '/axis-cgi/jpg/image.cgi?resolution=' + selectedResolution);
+});
+
+// Snapshot capture functionality
+$('#capture-snapshot').on('click', function() {
+	const selectedResolution = $('#snapshot-resolution').val();
+	const [width, height] = selectedResolution.split('x');
+	
+	// Trigger snapshot download
+	const downloadLink = document.createElement('a');
+	downloadLink.href = 'capture?width=' + width + '&height=' + height;
+	downloadLink.download = `snapshot_${selectedResolution}.jpeg`;
+	document.body.appendChild(downloadLink);
+	downloadLink.click();
+	document.body.removeChild(downloadLink);
+});
+
+</script>
+</body>
+</html>

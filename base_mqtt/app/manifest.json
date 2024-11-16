@@ -1,0 +1,25 @@
+{
+    "schemaVersion": "1.7.1",
+    "acapPackageConf": {
+        "setup": {
+            "friendlyName": "Base MQTT",
+            "appName": "basemqtt",
+            "vendor": "Fred Juhlin",
+            "embeddedSdkVersion": "3.0",
+            "vendorUrl": "https://pandosme.github.io",
+            "runMode": "once",
+            "version": "4.0.0"
+        },
+        "configuration": {
+			"settingPage": "index.html",
+			"httpConfig": [
+				{"name": "app","access": "admin","type": "fastCgi"},
+				{"name": "settings","access": "admin","type": "fastCgi"},
+				{"name": "status","access": "admin","type": "fastCgi"},
+				{"name": "mqtt","access": "admin","type": "fastCgi"},
+				{"name": "certs","access": "admin","type": "fastCgi"},
+				{"name": "publish","access": "admin","type": "fastCgi"}
+			]
+		}
+    }
+}

@@ -1,0 +1,179 @@
+
+html, body, #wrapper {
+  font-family: Arial, sans-serif;
+	height: 100%;
+}
+
+#sidebar-wrapper {
+	min-height: 100vh;
+}
+#page-content-wrapper {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+}
+.container-fluid {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+}
+.row {
+	flex: 1;
+}
+
+#view {
+	width: 100%;
+	height: 100%;
+}
+
+
+.sidebar-heading {
+    font-size: 1.5rem;
+    font-weight: bold;
+    text-align: center;
+    padding: 10px 0;
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #ccc;
+}
+
+.navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.5rem 1rem;
+}
+
+.navbar-text {
+    margin: 0 auto;
+}
+
+.control-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 800px;
+    margin-top: 10px;
+}
+
+.control-row select {
+    width: 80px;
+}
+
+.table-container {
+    margin-left: 20px;
+}
+
+.table {
+    width: 100%;
+    margin-top: 10px;
+}
+
+.btn {
+    margin-left: 10px;
+}
+
+.list-group-item.active {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+.list-group-item {
+    color: #333;
+}
+
+.list-group-item:hover {
+    background-color: #f8f9fa;
+    color: #007bff;
+}
+
+.form-group {
+    display: flex;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    min-width: 100px;
+    margin-right: 15px;
+    text-align: left;
+}
+
+.form-control, .form-control-plaintext {
+    width: 300px;
+    flex: 0 0 auto;
+}
+
+/* Special handling for TLS group with link */
+.input-wrapper {
+    display: flex;
+    flex-direction: column;
+    width: 300px;
+}
+
+.input-wrapper select {
+    width: 100%;
+}
+
+.cert-link {
+    margin-top: 0.5rem;
+    font-size: 0.875rem;
+}
+
+/* Button container alignment */
+.button-container {
+    margin-left: 115px; /* same as label min-width + margin-right */
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .form-group {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+    
+    .form-group label {
+        margin-bottom: 0.5rem;
+    }
+    
+    .form-control, .form-control-plaintext, .input-wrapper {
+        width: 100%;
+    }
+    
+    .button-container {
+        margin-left: 0;
+    }
+}
+
+.info-grid {
+    max-width: 800px;
+    margin-top: 1rem;
+}
+
+.info-row {
+    display: flex;
+    margin-bottom: 0.5rem;
+}
+
+.info-label {
+    min-width: 120px;
+    color: #333;
+    font-weight: normal;
+}
+
+.info-value {
+    flex: 1;
+}
+
+.info-value a {
+    color: #0d6efd;
+    text-decoration: none;
+}
+
+.info-value a:hover {
+    text-decoration: underline;
+}
+
+h2 {
+    color: #333;
+    margin-bottom: 1.5rem;
+}

@@ -1,0 +1,18 @@
+[
+	{
+		"name": "All ACAP Events",
+		"topic0": {"tnsaxis":"CameraApplicationPlatform"}
+	},
+	},
+	{
+		"name": "Camera Day and Night Switching",
+		"topic0": {"tns1":"VideoSource"},
+		"topic1": {"tnsaxis":"DayNightVision"}
+	},
+	{
+		"name": "Virtual Input",
+		"topic0": {"tns1":"Device"},
+		"topic1": {"tnsaxis":"IO"},
+		"topic2": {"tnsaxis":"VirtualInput"}
+	}
+]
