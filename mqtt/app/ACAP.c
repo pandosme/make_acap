@@ -24,8 +24,8 @@
 // Logging macros
 #define LOG(fmt, args...) { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
 #define LOG_WARN(fmt, args...) { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args); }
-#define LOG_TRACE(fmt, args...) { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
-//#define LOG_TRACE(fmt, args...) {}
+//#define LOG_TRACE(fmt, args...) { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
+#define LOG_TRACE(fmt, args...) {}
 
 // Global variables
 static cJSON* app = NULL;
@@ -235,6 +235,10 @@ ACAP_Get_Config(const char* service) {
  *------------------------------------------------------------------*/
 void
 ACAP_HTTP() {
+}
+
+void
+ACAP_HTTP_Close() {
 }
 
 static char* url_decode(const char* src) {
@@ -1981,23 +1985,15 @@ void ACAP_Cleanup(void) {
     }
     
     // Clean up other resources
-    http_node_count = 0;
-    ACAP_UpdateCallback = NULL;
-}
-
-static void cleanup_http(void) {
-    // Close any open FastCGI connections
     ACAP_HTTP_Close();
-    http_node_count = 0;
-}
-
-static void cleanup_status(void) {
     if (status_container) {
         cJSON_Delete(status_container);
         status_container = NULL;
     }
+	
+    http_node_count = 0;
+    ACAP_UpdateCallback = NULL;
 }
-
 
 /*------------------------------------------------------------------
  * Error Handling Implementation

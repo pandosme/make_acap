@@ -17,8 +17,8 @@
 
 #define LOG(fmt, args...)    { syslog(LOG_INFO, fmt, ## args);  printf(fmt, ## args); }
 #define LOG_WARN(fmt, args...)    { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args);}
-#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
-//#define LOG_TRACE(fmt, args...)    {}
+//#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
+#define LOG_TRACE(fmt, args...)    {}
 #define URL_SIZE	256
 
 int MQTT_LoadLib();
@@ -607,8 +607,32 @@ MQTT_Publish( const char *topic, const char *payload, int qos, int retained ) {
 
 int
 MQTT_Publish_JSON( const char *topic, cJSON* payload, int qos, int retained ) {
+	LOG_TRACE("%s:\n",__func__);
+
+	if( !topic || strlen(topic) == 0 ) {
+		LOG_TRACE("%s: Invallid topic\n",__func__);
+		return 0;
+	}
+
+	if( !payload ) {
+		LOG_TRACE("%s: Invallid payload\n",__func__);
+		return 0;
+	}
+
+	if( client == 0 ) {
+//		LOG_TRACE("%s: Invalid client\n",__func__);
+		return 0;
+	}
+	if( !(*f_MQTTClient_isConnected)(client) ) {
+//		LOG_TRACE("%s: Client not connected\n",__func__);
+		return 0;
+	}
+	
+	LOG_TRACE("%s: Debug 0\n",__func__);
 	cJSON* publish = cJSON_Duplicate(payload, 1);
 	cJSON* helperProperties = cJSON_GetObjectItem(MQTTSettings,"payload");
+	LOG_TRACE("%s: Debug 1\n",__func__);
+
 	if( helperProperties ) {
 		const char* name = cJSON_GetObjectItem(helperProperties,"name")?cJSON_GetObjectItem(helperProperties,"name")->valuestring:0;
 		const char* location = cJSON_GetObjectItem(helperProperties,"location")?cJSON_GetObjectItem(helperProperties,"location")->valuestring:0;
@@ -616,16 +640,25 @@ MQTT_Publish_JSON( const char *topic, cJSON* payload, int qos, int retained ) {
 			cJSON_AddStringToObject(publish,"name",name);
 		if( location && strlen(location) > 0 )
 			cJSON_AddStringToObject(publish,"location",location);
+		if( cJSON_GetObjectItem(helperProperties,"serial") )
+			if(cJSON_GetObjectItem(helperProperties,"serial")->type==cJSON_True)
+				cJSON_AddStringToObject(publish,"serial",ACAP_DEVICE_Prop("serial"));
 	}
+
+	LOG_TRACE("%s: Debug 2\n",__func__);
 
 	char *json = cJSON_PrintUnformatted(publish);
 	if(!json) {
 		LOG("%s: Unable to format JSON\n",__func__);
+		LOG_TRACE("%s: Exit error\n",__func__);
 		return 0;
 	}
 	cJSON_Delete(publish);
+	LOG_TRACE("%s: Debug 3\n",__func__);
+	
 	int result = MQTT_Publish(topic, json, qos, retained );
 	free(json);
+	LOG_TRACE("%s: Exit\n",__func__);
 	return result;
 }
 

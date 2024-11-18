@@ -3,7 +3,7 @@
 #include <string.h>
 #include <syslog.h>
 #include <glib.h>
-
+#include <signal.h>
 #include "ACAP.h"
 #include "cJSON.h"
 
@@ -14,6 +14,24 @@
 #define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
 //#define LOG_TRACE(fmt, args...)    {}
 
+static GMainLoop *main_loop = NULL;
+static volatile sig_atomic_t shutdown_flag = 0;
+
+void term_handler(int signum) {
+    if (signum == SIGTERM) {
+        shutdown_flag = 1;
+        if (main_loop) {
+            g_main_loop_quit(main_loop);
+        }
+    }
+}
+
+void cleanup_resources(void) {
+    LOG("Performing cleanup before shutdown\n");
+    ACAP_Cleanup();
+    closelog();
+}
+
 void My_Event_Callback(cJSON *event) {
 	char* json = cJSON_PrintUnformatted(event);
 	LOG("%s: %s\n", __func__,json);
@@ -21,7 +39,12 @@ void My_Event_Callback(cJSON *event) {
 }
 
 int main(void) {
-	static GMainLoop *main_loop = NULL;
+    struct sigaction action;
+    
+    // Initialize signal handling
+    memset(&action, 0, sizeof(struct sigaction));
+    action.sa_handler = term_handler;
+    sigaction(SIGTERM, &action, NULL);
 	
 	openlog(APP_PACKAGE, LOG_PID|LOG_CONS, LOG_USER);
 	LOG("------ Starting ACAP Service ------\n");
@@ -39,7 +62,20 @@ int main(void) {
 	
 	g_idle_add(ACAP_HTTP_Process, NULL);
 
-	main_loop = g_main_loop_new(NULL, FALSE);
-	g_main_loop_run(main_loop);
+    main_loop = g_main_loop_new(NULL, FALSE);
+    
+    // Register cleanup function to be called at normal program termination
+    atexit(cleanup_resources);
+    
+    g_main_loop_run(main_loop);
+    
+    if (shutdown_flag) {
+        LOG("Received SIGTERM signal, shutting down gracefully\n");
+    }
+    
+    if (main_loop) {
+        g_main_loop_unref(main_loop);
+    }
+    
     return 0;
 }

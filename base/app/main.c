@@ -3,6 +3,7 @@
 #include <string.h>
 #include <syslog.h>
 #include <glib.h>
+#include <signal.h>
 
 #include "vdo-stream.h"
 #include "vdo-frame.h"
@@ -14,8 +15,26 @@
 
 #define LOG(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args);}
 #define LOG_WARN(fmt, args...)    { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args);}
-#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
-//#define LOG_TRACE(fmt, args...)    {}
+//#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
+#define LOG_TRACE(fmt, args...)    {}
+
+static GMainLoop *main_loop = NULL;
+static volatile sig_atomic_t shutdown_flag = 0;
+
+void term_handler(int signum) {
+    if (signum == SIGTERM) {
+        shutdown_flag = 1;
+        if (main_loop) {
+            g_main_loop_quit(main_loop);
+        }
+    }
+}
+
+void cleanup_resources(void) {
+    LOG("Performing cleanup before shutdown\n");
+    ACAP_Cleanup();
+    closelog();
+}
 
 
 void
@@ -132,7 +151,12 @@ HTTP_Endpoint_capture(const ACAP_HTTP_Response response, const ACAP_HTTP_Request
 
 
 int main(void) {
-	static GMainLoop *main_loop = NULL;
+    struct sigaction action;
+    
+    // Initialize signal handling
+    memset(&action, 0, sizeof(struct sigaction));
+    action.sa_handler = term_handler;
+    sigaction(SIGTERM, &action, NULL);
 	
 	openlog(APP_PACKAGE, LOG_PID|LOG_CONS, LOG_USER);
 	LOG("------ Starting ACAP Service ------\n");
@@ -144,6 +168,18 @@ int main(void) {
 
 	g_idle_add(ACAP_HTTP_Process, NULL);
 	main_loop = g_main_loop_new(NULL, FALSE);
+
+    atexit(cleanup_resources);
+	
 	g_main_loop_run(main_loop);
+
+    if (shutdown_flag) {
+        LOG("Received SIGTERM signal, shutting down gracefully\n");
+    }
+    
+    if (main_loop) {
+        g_main_loop_unref(main_loop);
+    }
+	
     return 0;
 }

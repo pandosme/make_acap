@@ -57,6 +57,7 @@ cJSON*		ACAP(const char* package, ACAP_Config_Update updateCallback);
 const char* ACAP_Name(void);
 int 		ACAP_Set_Config(const char* service, cJSON* serviceSettings);
 cJSON* 		ACAP_Get_Config(const char* service);
+void		ACAP_Cleanup(void);
 
 /*-----------------------------------------------------
  * HTTP Functions

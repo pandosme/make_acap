@@ -14,10 +14,10 @@
     <div class="d-flex" id="wrapper">
         <!-- Sidebar -->
         <div class="bg-light border-right" id="sidebar-wrapper">
-            <div class="sidebar-heading"></div>
+			<div class="sidebar-heading">&nbsp;</div>
             <div class="list-group list-group-flush">
-			<a href="index.html" class="list-group-item list-group-item-action">Video</a>
-			<a href="about.html" class="list-group-item list-group-item-action active">About</a>
+				<a href="index.html" class="list-group-item list-group-item-action">Video</a>
+				<a href="about.html" class="list-group-item list-group-item-action active">About</a>
             </div>
         </div>
         <!-- /#sidebar-wrapper -->
@@ -98,7 +98,7 @@ $(document).ready(function() {
 		success: function(app) {
 			// Update UI elements
 			document.title = app.manifest.acapPackageConf.setup.friendlyName;
-			$("#sidebar-wrapper .sidebar-heading").html(app.manifest.acapPackageConf.setup.friendlyName);
+			$('.acap_name').text(app.manifest.acapPackageConf.setup.friendlyName);
 			$('#name').text(app.manifest.acapPackageConf.setup.friendlyName);
 			$('#package').text(app.manifest.acapPackageConf.setup.appName);
 			$('#version').text(app.manifest.acapPackageConf.setup.version);
