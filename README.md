@@ -10,11 +10,11 @@ The standard base for majority ACAP including
 - Decalreing and Fire events
 - Web Interface with video streaming capabilities
 
-## Base Event Subscription
+## Event Subscription
 - Simple declarations of events to be subscribed to
 - Simple callback to process events
 
-## Base MQTT
+## MQTT
 - MQTT Client
   * Using the same MQTT libraries as the Axis Device MQTT client
   * Does not impact the device MQTT client
