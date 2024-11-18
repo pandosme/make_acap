@@ -76,7 +76,7 @@ ACAP_EVENTS_Fire("trigger");
 ```
 
 ### HTTP Endpoint Handler
-```c
+```
 void HTTP_Endpoint_capture(const ACAP_HTTP_Response response, 
                            const ACAP_HTTP_Request request) {
     // Capture and return JPEG snapshot
