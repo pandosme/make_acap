@@ -46,6 +46,7 @@ Detaile information can be found at https://axiscommunications.github.io/acap-do
 # Template project description
 
 ## Directory structure
+```
 .
 ├── app
 │   ├── ACAP.c
@@ -65,6 +66,7 @@ Detaile information can be found at https://axiscommunications.github.io/acap-do
 │   └── manifest.json
 ├── Dockerfile
 └── README.md
+```
 
 ## Dockerfile
 The development tool-cahin is provided ba Axis as images, containing all services to compile and package an ACAP.  The Dockerfile defines which Axis ACAP development image to use targeting various platforms
