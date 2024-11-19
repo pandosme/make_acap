@@ -215,10 +215,24 @@ int main(void) {
 
 ### ACAP Addon Configuration
 Axis ACAP SDK provides ax_paramter.  It is not recommended to use this as to store Addon configuration params.  The ACAP.h and ACAP.c wroter provides a simple way to declare and manage configurations using JSON.
-1. Add the file ./app/html/config/settings.json with a valid JSON structure representing the settings.
+1. Add the file ```./app/html/config/settings.json``` with a valid JSON structure representing the settings.
 2. Initialize the ACAP Wrapper with a settings-changed-callback
 The callback will be called when the ACAP starts in order to initialize internal variable;
 
+Example of configuration settings.json
+```
+{
+  "someStrinParam": "Hello",
+  "someNumberParam: 52,
+  "someBoolParam: false,
+  "someoObjectParam": {
+      "a": 1,
+      "b": 2
+  }
+}
+```
+
+Example Code working with settings.
 ```
 void
 Settings_Updated_Callback( const char *service, cJSON* data) {
