@@ -391,5 +391,5 @@ In your code
 - [Axis ACAP SDK Documentation](https://www.axis.com/developer-community)
 - [ACAP Developer Guide](https://developer.axis.com)
 - [ACAP Template projects by Fred Juhlin](https://github.com/pandosme/make_acap)
-- [Axis Communications GitHub of examples] (https://github.com/AxisCommunications/acap-native-sdk-examples)
+- [Axis Communications GitHub of examples](https://github.com/AxisCommunications/acap-native-sdk-examples)
 
