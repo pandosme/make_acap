@@ -1,14 +1,15 @@
 # Make ACAP
-Working with the ACAP ASK API is not trivial.  Also, the SDK API may change over time.  A solution to both challanges is to use an ACAP SDK Wrapper that provides abstraction layer API.  One such Layer is ACAP.h and ACAP.c.
-Including the files in the project allows faster development as you can focus on the use case.  If future ACAP SDK version introduces breaking changes, you only need to adjut the ACAP.c in order to support future versions.
 
-# Template starting Point
+Working with the ACAP SDK API is not trivial. Also, the SDK API may change over time. A solution to both challenges is to use an ACAP SDK Wrapper that provides an abstraction layer API. One such Layer is ACAP.h and ACAP.c. Including the files in the project allows faster development as you can focus on the use case. If future ACAP SDK versions introduce breaking changes, you only need to adjust the ACAP.c to support future versions.
+
+# Template Starting Point
+
 ## Base
-The standard base for majority ACAP including
-- HTTP (based on fastgci) incuding GET, POST and file transfer
+The standard base for majority of ACAPs including:
+- HTTP (based on fastcgi) including GET, POST and file transfer
 - Image capture
 - Managing ACAP configuration parameters
-- Decalreing and Fire events
+- Declaring and Fire events
 - Web Interface with video streaming capabilities
 
 ## Event Subscription
@@ -23,11 +24,11 @@ The standard base for majority ACAP including
 - Simple Publish and Subscribe functions
 
 # Overview
-The ACAP SDK provide interface for services in the Axis Device including
+The ACAP SDK provides interface for services in the Axis Device including:
 * HTTP Endpoints
-* Evenent management system in order for an ACAP service to fire events or subscribe to events fired by other services
+* Event management system for an ACAP service to fire events or subscribe to events fired by other services
 * Configuration management
-* Image captureing and image processing
+* Image capturing and image processing
 * PTZ control
 * I/O management
 * SD-Card storage
@@ -35,16 +36,15 @@ The ACAP SDK provide interface for services in the Axis Device including
 * Curl
 * OpenCV
 
-Detaile information can be found at https://axiscommunications.github.io/acap-documentation/ 
+Detailed information can be found at https://axiscommunications.github.io/acap-documentation/
 
 ## Prerequisites
-* One or more Axis Devices supporting the ACAP addons.
-* A PC that have Docker installed
-* Knowldge in C programming (embedded development)
-* Knowldge in HTML, JavaScript and CSS for the ACAP user interface
+* One or more Axis Devices supporting the ACAP addons
+* A PC that has Docker installed
+* Knowledge in C programming (embedded development)
+* Knowledge in HTML, JavaScript and CSS for the ACAP user interface
 
 # Template project description
-
 ## Directory structure
 ```
 .
@@ -236,13 +236,13 @@ Example Code working with settings.
 ```
 void
 Settings_Updated_Callback( const char *service, cJSON* data) {
-	if( strcmp(serice,"settings") != 0 )
+	if( strcmp(service,"settings") != 0 )
 		return;
 
 	cJSON* setting = data->child;
 	while(setting) {
-		if( strcmp( "param1", setting->string ) == 0 ) {
-			LOG("Changed event param1 to %d\n", setting->valueint);
+		if( strcmp( "someNumberParam", setting->string ) == 0 ) {
+			LOG("Changed event someNumberParam to %d\n", setting->valueint);
 		}
 		...
 		setting = setting->next;
