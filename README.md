@@ -94,11 +94,13 @@ FROM ${REPO}/${SDK}:${VERSION}-${ARCH}-ubuntu${UBUNTU_VERSION} as sdk
 WORKDIR /opt/app
 COPY ./app .
 RUN . /opt/axis/acapsdk/environment-setup* && acap-build .
+```
 
 ## Makefile
 In order to compile the ACAP Project there must be a Makefile.  The Makefile must include reference to all C-files and packages used by the Project.
 
-### Example of a typicall 
+### Typical Makefile
+```
 PROG1	= base
 OBJS1	= main.c ACAP.c cJSON.c
 PROGS	= $(PROG1)
@@ -146,8 +148,7 @@ The manifest defines sveral properties for the project and what resources it wil
 }
 ```
 
-
-## Examples
+## Example code
 The following examples use ACAP.h and ACAP.c SDK Wrappers for common integration with device services.
  
 ### main.c
