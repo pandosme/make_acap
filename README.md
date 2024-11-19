@@ -222,7 +222,7 @@ The callback will be called when the ACAP starts in order to initialize internal
 Example of configuration settings.json
 ```
 {
-  "someStrinParam": "Hello",
+  "someStringParam": "Hello",
   "someNumberParam: 52,
   "someBoolParam: false,
   "someoObjectParam": {
