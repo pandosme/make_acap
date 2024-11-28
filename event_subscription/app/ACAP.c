@@ -8,6 +8,7 @@
 #include <stdarg.h>
 #include <syslog.h>
 #include <string.h>
+#include <glib.h>
 #include <time.h>
 #include <math.h>
 #include <unistd.h>
@@ -34,19 +35,18 @@ static cJSON* status_container = NULL;
 static char ACAP_package_name[ACAP_MAX_PACKAGE_NAME];
 static ACAP_Config_Update ACAP_UpdateCallback = NULL;
 
-// HTTP node structure
-typedef struct {
-    char path[ACAP_MAX_PATH_LENGTH];
-    ACAP_HTTP_Callback callback;
-} HTTPNode;
-
-static HTTPNode http_nodes[ACAP_MAX_HTTP_NODES];
-static int http_node_count = 0;
 
 /*-----------------------------------------------------
  * Core Functions Implementation
  *-----------------------------------------------------*/
- 
+gboolean
+ACAP_Process(gpointer user_data) {
+	(void)user_data;
+    ACAP_HTTP_Process();
+//    ACAP_TIMER_Process();
+	return G_SOURCE_CONTINUE;
+}
+
 static void
 ACAP_ENDPOINT_app(const ACAP_HTTP_Response response, const ACAP_HTTP_Request request) {
     // Check request method
@@ -233,33 +233,17 @@ ACAP_Get_Config(const char* service) {
 /*------------------------------------------------------------------
  * HTTP Request Processing Implementation
  *------------------------------------------------------------------*/
-void
-ACAP_HTTP() {
-}
 
-void
-ACAP_HTTP_Close() {
-}
+typedef struct {
+    char path[ACAP_MAX_PATH_LENGTH];
+    ACAP_HTTP_Callback callback;
+} HTTPNode;
 
-static char* url_decode(const char* src) {
-    static char decoded[2048];
-    size_t src_len = strlen(src);
-    size_t i, j = 0;
+static int initialized = 0;
+static int fcgi_sock = -1;
+static HTTPNode http_nodes[ACAP_MAX_HTTP_NODES];
+static int http_node_count = 0;
 
-    for (i = 0; i < src_len && j < sizeof(decoded) - 1; i++) {
-        if (src[i] == '%' && i + 2 < src_len) {
-            char hex[3] = {src[i + 1], src[i + 2], 0};
-            decoded[j++] = (char)strtol(hex, NULL, 16);
-            i += 2;
-        } else if (src[i] == '+') {
-            decoded[j++] = ' ';
-        } else {
-            decoded[j++] = src[i];
-        }
-    }
-    decoded[j] = '\0';
-    return decoded;
-}
 
 static const char* get_path_without_query(const char* uri) {
     static char path[ACAP_MAX_PATH_LENGTH];
@@ -275,6 +259,27 @@ static const char* get_path_without_query(const char* uri) {
         return path;
     }
     return uri;
+}
+
+int
+ACAP_HTTP() {
+    if (!initialized) {
+        if (FCGX_Init() != 0) {
+            LOG_WARN("Failed to initialize FCGI\n");
+            return 0;
+        }
+        initialized = 1;
+    }
+	return 1;
+}
+
+void ACAP_HTTP_Cleanup() {
+	LOG_TRACE("%s:",__func__);
+    if (fcgi_sock != -1) {
+        close(fcgi_sock);
+        fcgi_sock = -1;
+    }
+    initialized = 0;
 }
 
 const char* ACAP_HTTP_Get_Method(const ACAP_HTTP_Request request) {
@@ -310,9 +315,9 @@ int ACAP_HTTP_Node(const char *nodename, ACAP_HTTP_Callback callback) {
     // Construct full path
     char full_path[ACAP_MAX_PATH_LENGTH];
     if (nodename[0] == '/') {
-        snprintf(full_path, sizeof(full_path), "/local/%s%s", ACAP_Name(), nodename);
+        snprintf(full_path, ACAP_MAX_PATH_LENGTH, "/local/%s%s", ACAP_Name(), nodename);
     } else {
-        snprintf(full_path, sizeof(full_path), "/local/%s/%s", ACAP_Name(), nodename);
+        snprintf(full_path, ACAP_MAX_PATH_LENGTH, "/local/%s/%s", ACAP_Name(), nodename);
     }
 
     // Check for duplicate paths
@@ -324,44 +329,35 @@ int ACAP_HTTP_Node(const char *nodename, ACAP_HTTP_Callback callback) {
     }
 
     // Add new node
-    strncpy(http_nodes[http_node_count].path, full_path, ACAP_MAX_PATH_LENGTH - 1);
-    http_nodes[http_node_count].callback = callback;
-    http_node_count++;
+	snprintf(http_nodes[http_node_count].path, ACAP_MAX_PATH_LENGTH, "%s", full_path);
+	http_nodes[http_node_count].callback = callback;
+	http_node_count++;
 
     return 1;
 }
 
 
-int ACAP_HTTP_Process(void) {
-    
-    FCGX_Request request;
+void ACAP_HTTP_Process() {
+	FCGX_Request request;
     ACAP_HTTP_Request_DATA requestData = {0};
     char* socket_path = NULL;
 
-    // Initialize on first call
-    static int initialized = 0;
-    if (!initialized) {
-        if (FCGX_Init() != 0) {
-            LOG_WARN("Failed to initialize FCGI\n");
-            return 0;
-        }
-        initialized = 1;
-    }
+    if (!initialized)
+		return;
 
     // Get socket path
     socket_path = getenv("FCGI_SOCKET_NAME");
     if (!socket_path) {
         LOG_WARN("Failed to get FCGI_SOCKET_NAME\n");
-        return 0;
+        return;
     }
 
     // Open socket if not already open
-    static int fcgi_sock = -1;
     if (fcgi_sock == -1) {
         fcgi_sock = FCGX_OpenSocket(socket_path, 5);
         if (fcgi_sock < 0) {
             LOG_WARN("Failed to open FCGI socket\n");
-            return 0;
+            return;
         }
         chmod(socket_path, 0777);
     }
@@ -369,13 +365,13 @@ int ACAP_HTTP_Process(void) {
     // Initialize request
     if (FCGX_InitRequest(&request, fcgi_sock, 0) != 0) {
         LOG_WARN("FCGX_InitRequest failed\n");
-        return 0;
+        return;
     }
 
     // Accept the request
     if (FCGX_Accept_r(&request) != 0) {
         FCGX_Free(&request, 1);
-        return 0;
+        return;
     }
 
     // Setup request data structure
@@ -432,7 +428,7 @@ cleanup:
         free((void*)requestData.postData);
     }
     FCGX_Finish_r(&request);
-    return 1;
+    return;
 }
 
 /*------------------------------------------------------------------
@@ -663,12 +659,13 @@ cJSON* ACAP_STATUS_Group(const char* name) {
 
 void ACAP_STATUS_SetBool(const char* group, const char* name, int state) {
     if (!group || !name) {
-        LOG_WARN("Invalid group or name parameter\n");
+        LOG_WARN("%s: Invalid group or name parameter\n", __func__);
         return;
     }
 
     cJSON* groupObj = ACAP_STATUS_Group(group);
     if (!groupObj) {
+		LOG_TRACE("%s: Unknown %s\n",__func__,group);
         return;
     }
 
@@ -763,11 +760,15 @@ void ACAP_STATUS_SetNull(const char* group, const char* name) {
 int ACAP_STATUS_Bool(const char* group, const char* name) {
     cJSON* groupObj = ACAP_STATUS_Group(group);
     if (!groupObj) {
+		LOG_TRACE("%s: Invalid group \n",__func__);
         return 0;
     }
 
     cJSON* item = cJSON_GetObjectItem(groupObj, name);
-    return item && cJSON_IsBool(item) ? item->valueint : 0;
+	if( !item ) {
+		return 0;
+	}
+    return item->type == cJSON_True?1:0;
 }
 
 int ACAP_STATUS_Int(const char* group, const char* name) {
@@ -1366,6 +1367,39 @@ typedef struct S_ValueElement {
 } T_ValueElement;
 
 
+cJSON*
+ACAP_EVENTS() {
+	LOG_TRACE("%s:\n",__func__);
+	//Get the ACAP package ID and Nice Name
+	cJSON* manifest = ACAP_Get_Config("manifest");
+	if(!manifest)
+		return cJSON_CreateNull();
+	cJSON* acapPackageConf = cJSON_GetObjectItem(manifest,"acapPackageConf");
+	if(!acapPackageConf)
+		return cJSON_CreateNull();
+	cJSON* setup = cJSON_GetObjectItem(acapPackageConf,"setup");
+	if(!setup)
+		return cJSON_CreateNull();
+	sprintf(ACAP_EVENTS_PACKAGE,"%s", cJSON_GetObjectItem(setup,"appName")->valuestring);
+	sprintf(ACAP_EVENTS_APPNAME,"%s", cJSON_GetObjectItem(setup,"friendlyName")->valuestring);
+	
+	LOG_TRACE("%s: %s %s\n",__func__,ACAP_EVENTS_PACKAGE,ACAP_EVENTS_APPNAME);
+
+	ACAP_EVENTS_SUBSCRIPTIONS = cJSON_CreateArray();
+	ACAP_EVENTS_DECLARATIONS = cJSON_CreateObject();
+	ACAP_EVENTS_HANDLER = ax_event_handler_new();
+	
+	cJSON* events = ACAP_FILE_Read( "html/config/events.json" );
+	if(!events)
+		LOG_WARN("Cannot load even event list\n")
+	cJSON* event = events?events->child:0;
+	while( event ) {
+		ACAP_EVENTS_Add_Event_JSON( event );
+		event = event->next;
+	}
+	return events;
+}
+
 int
 ACAP_EVENTS_SetCallback( ACAP_EVENTS_Callback callback ){
 	LOG_TRACE("%s: Entry\n",__func__);
@@ -1646,8 +1680,6 @@ ACAP_EVENTS_Add_Event( const char *id, const char* name, int state ) {
 		return 0;
 	}
 
-	LOG_TRACE("%s: Entry: ID=%s Name=%s State=%s\n",__func__,id, name, state?"Stateful":"Stateless");
-
 	set = ax_event_key_value_set_new();
 	
 	ax_event_key_value_set_add_key_value( set, "topic0", "tnsaxis", "CameraApplicationPlatform", AX_VALUE_TYPE_STRING,NULL);
@@ -1672,7 +1704,8 @@ ACAP_EVENTS_Add_Event( const char *id, const char* name, int state ) {
 		ax_event_key_value_set_free(set);
 		return 0;
 	}
-	LOG_TRACE("ACAP_EVENTS_Add_Event: %s %s\n", id, name );
+	LOG_TRACE("%s: %s %s %s\n",__func__,id, name, state?"Stateful":"Stateless");
+
 	cJSON_AddNumberToObject(ACAP_EVENTS_DECLARATIONS,id,declarationID);
 	ax_event_key_value_set_free(set);
 	return declarationID;
@@ -1680,7 +1713,7 @@ ACAP_EVENTS_Add_Event( const char *id, const char* name, int state ) {
 
 int
 ACAP_EVENTS_Remove_Event(const char *id ) {
-
+	LOG_TRACE("%s: %s",__func__,id);
 	if( !ACAP_EVENTS_HANDLER || !id || !ACAP_EVENTS_DECLARATIONS) {
 		LOG_TRACE("ACAP_EVENTS_Remove_Event: Invalid input\n");
 		return 0;
@@ -1697,41 +1730,6 @@ ACAP_EVENTS_Remove_Event(const char *id ) {
 	return 1;
 }
 
-int
-ACAP_EVENTS_Fire_State( const char* id, int value ) {
-	LOG_TRACE("%s: %s %d\n", __func__, id, value );
-	
-	if( !ACAP_EVENTS_DECLARATIONS || !id ) {
-		LOG_WARN("EVENTs_Fire_State: Error send event\n");
-		return 0;
-	}
-
-	cJSON *event = cJSON_GetObjectItem(ACAP_EVENTS_DECLARATIONS, id );
-	if(!event) {
-		LOG_WARN("Error sending event %s.  Event not found\n", id);
-		return 0;
-	}
-
-	AXEventKeyValueSet* set = ax_event_key_value_set_new();
-
-	if( !ax_event_key_value_set_add_key_value(set,"state",NULL , &value,AX_VALUE_TYPE_BOOL,NULL) ) {
-		ax_event_key_value_set_free(set);
-		LOG_WARN("EVENT_Fire_State: Could not send event %s.  Internal error\n", id);
-		return 0;
-	}
-
-	AXEvent* axEvent = ax_event_new2(set, NULL);
-	ax_event_key_value_set_free(set);
-
-	if( !ax_event_handler_send_event(ACAP_EVENTS_HANDLER, event->valueint, axEvent, NULL) )  {
-		LOG_WARN("EVENT_Fire_State: Could not send event %s\n", id);
-		ax_event_free(axEvent);
-		return 0;
-	}
-	ax_event_free(axEvent);
-	LOG_TRACE("EVENT_Fire_State: %s %d fired\n", id,value );
-	return 1;
-}
 
 int
 ACAP_EVENTS_Fire( const char* id ) {
@@ -1775,12 +1773,109 @@ ACAP_EVENTS_Fire( const char* id ) {
 }
 
 int
+ACAP_EVENTS_Fire_State( const char* id, int value ) {
+	if( value && ACAP_STATUS_Bool("events",id) )
+		return 1;  //The state is already high
+	if( !value && !ACAP_STATUS_Bool("events",id) )
+		return 1;  //The state is already low
+
+	LOG_TRACE("%s: %s %d\n", __func__, id, value );
+	
+	if( !ACAP_EVENTS_DECLARATIONS || !id ) {
+		LOG_WARN("EVENTs_Fire_State: Error send event\n");
+		return 0;
+	}
+
+	cJSON *event = cJSON_GetObjectItem(ACAP_EVENTS_DECLARATIONS, id );
+	if(!event) {
+		LOG_WARN("Error sending event %s.  Event not found\n", id);
+		return 0;
+	}
+
+	AXEventKeyValueSet* set = ax_event_key_value_set_new();
+
+	if( !ax_event_key_value_set_add_key_value(set,"state",NULL , &value,AX_VALUE_TYPE_BOOL,NULL) ) {
+		ax_event_key_value_set_free(set);
+		LOG_WARN("EVENT_Fire_State: Could not send event %s.  Internal error\n", id);
+		return 0;
+	}
+
+	AXEvent* axEvent = ax_event_new2(set, NULL);
+	ax_event_key_value_set_free(set);
+
+	if( !ax_event_handler_send_event(ACAP_EVENTS_HANDLER, event->valueint, axEvent, NULL) )  {
+		LOG_WARN("EVENT_Fire_State: Could not send event %s\n", id);
+		ax_event_free(axEvent);
+		return 0;
+	}
+	ax_event_free(axEvent);
+	ACAP_STATUS_SetBool("events",id,value);
+	LOG_TRACE("EVENT_Fire_State: %s %d fired\n", id,value );
+	return 1;
+}
+
+
+int
+ACAP_EVENTS_Fire_JSON( const char* Id, cJSON* data ) {
+	AXEventKeyValueSet *set = NULL;
+	int boolValue;
+	GError *error = NULL;
+	if(!data) {
+		LOG_WARN("%s: Invalid data",__func__);
+		return 0;
+	}
+
+	cJSON *event = cJSON_GetObjectItem(ACAP_EVENTS_DECLARATIONS, Id );
+	if(!event) {
+		LOG_WARN("%s: Error sending event %s.  Event not found\n",__func__,Id);
+		return 0;
+	}
+	
+
+	set = ax_event_key_value_set_new();
+	int success = 0;
+	cJSON* property = data->child;
+	while(property) {
+		if(property->type == cJSON_True ) {
+			boolValue = 1;
+			success = ax_event_key_value_set_add_key_value(set,property->string,NULL , &boolValue,AX_VALUE_TYPE_BOOL,NULL);
+			LOG_TRACE("%s: Set %s %s = True\n",__func__,Id,property->string);
+		}
+		if(property->type == cJSON_False ) {
+			boolValue = 0;
+			success = ax_event_key_value_set_add_key_value(set,property->string,NULL , &boolValue,AX_VALUE_TYPE_BOOL,NULL);
+			LOG_TRACE("%s: Set %s %s = False\n",__func__,Id,property->string);
+		}
+		if(property->type == cJSON_String ) {
+			success = ax_event_key_value_set_add_key_value(set,property->string,NULL , property->valuestring,AX_VALUE_TYPE_STRING,NULL);
+			LOG_TRACE("%s: Set %s %s = %s\n",__func__,Id,property->string,property->valuestring);
+		}
+		if(property->type == cJSON_Number ) {
+			success = ax_event_key_value_set_add_key_value(set,property->string,NULL , &property->valuedouble,AX_VALUE_TYPE_DOUBLE,NULL);
+			LOG_TRACE("%s: Set %s %s = %f\n",__func__,Id,property->string,property->valuedouble);
+		}
+		if(!success)
+			LOG_WARN("%s: Unable to add property\n",__func__);
+		property = property->next;
+	}
+
+	AXEvent* axEvent = ax_event_new2(set, NULL);
+	success = ax_event_handler_send_event(ACAP_EVENTS_HANDLER, event->valueint, axEvent, &error);
+	ax_event_key_value_set_free(set);
+	ax_event_free(axEvent);
+	if(!success)  {
+		LOG_WARN("%s: Could not send event %s id = %d %s\n",__func__, Id, event->valueint, error->message);
+		g_error_free(error);
+		return 0;
+	}
+	return 1;
+}
+
+int
 ACAP_EVENTS_Add_Event_JSON( cJSON* event ) {
 	AXEventKeyValueSet *set = NULL;
 	GError *error = NULL;
-//	int dummy_value = 0;
 	guint declarationID;
-//	char* json = 0;
 	int success = 0;	
 	set = ax_event_key_value_set_new();
 	
@@ -1867,113 +1962,134 @@ ACAP_EVENTS_Add_Event_JSON( cJSON* event ) {
 	}
 	cJSON_AddNumberToObject(ACAP_EVENTS_DECLARATIONS,eventID,declarationID);
 	ax_event_key_value_set_free(set);
-	
-/*	
-	char *json;
-	json = cJSON_PrintUnformatted(event);
-	if( json ) {
-		LOG("%s: %s\n",__func__,json);
-		free(json);
-	}
-*/	
 	return declarationID;
 }
 
-int
-ACAP_EVENTS_Fire_JSON( const char* Id, cJSON* data ) {
-	AXEventKeyValueSet *set = NULL;
-	int boolValue;
-	GError *error = NULL;
-	LOG_TRACE("%s: Entry\n",__func__);
-	if(!data)
-		return 0;
+/*------------------------------------------------------------------
+ * Timer functions
+ *------------------------------------------------------------------*/
 
-	cJSON *event = cJSON_GetObjectItem(ACAP_EVENTS_DECLARATIONS, Id );
-	if(!event) {
-		LOG_WARN("%s: Error sending event %s.  Event not found\n",__func__,Id);
-		return 0;
-	}
+typedef struct ACAP_Timer {
+    char* name;
+    int active;
+    int repeat_rate_seconds;
+    time_t next_trigger;
+    ACAP_TIMER_Callback callback;
+    struct ACAP_Timer* next;
+} ACAP_Timer;
 
+static ACAP_Timer* timer_list = NULL;
 
-	set = ax_event_key_value_set_new();
-	int success = 0;
-	cJSON* property = data->child;
-	while(property) {
-		if(property->type == cJSON_True ) {
-			boolValue = 1;
-			success = ax_event_key_value_set_add_key_value(set,property->string,NULL , &boolValue,AX_VALUE_TYPE_BOOL,NULL);
-			LOG_TRACE("%s: Set %s %s = True\n",__func__,Id,property->string);
-		}
-		if(property->type == cJSON_False ) {
-			boolValue = 0;
-			success = ax_event_key_value_set_add_key_value(set,property->string,NULL , &boolValue,AX_VALUE_TYPE_BOOL,NULL);
-			LOG_TRACE("%s: Set %s %s = False\n",__func__,Id,property->string);
-		}
-		if(property->type == cJSON_String ) {
-			success = ax_event_key_value_set_add_key_value(set,property->string,NULL , property->valuestring,AX_VALUE_TYPE_STRING,NULL);
-			LOG_TRACE("%s: Set %s %s = %s\n",__func__,Id,property->string,property->valuestring);
-		}
-		if(property->type == cJSON_Number ) {
-			success = ax_event_key_value_set_add_key_value(set,property->string,NULL , &property->valuedouble,AX_VALUE_TYPE_DOUBLE,NULL);
-			LOG_TRACE("%s: Set %s %s = %f\n",__func__,Id,property->string,property->valuedouble);
-		}
-		if(!success)
-			LOG_WARN("%s: Unable to add property\n",__func__);
-		property = property->next;
-	}
+int ACAP_TIMER_Set(const char* name, int repeat_rate_seconds, ACAP_TIMER_Callback callback) {
+    LOG_TRACE("%s: %s %d seconds", __func__, name, repeat_rate_seconds);
+    ACAP_Timer* existing = timer_list;
+    
+    while (existing) {
+        if (strcmp(existing->name, name) == 0) {
+            existing->repeat_rate_seconds = repeat_rate_seconds;
+            existing->callback = callback;
+            existing->next_trigger = time(NULL) + repeat_rate_seconds;
+            existing->active = 1;
+            return 1;
+        }
+        existing = existing->next;
+    }
 
-	AXEvent* axEvent = ax_event_new2(set, NULL);
+    ACAP_Timer* new_timer = (ACAP_Timer*)malloc(sizeof(ACAP_Timer));
+    if (!new_timer) return 0;
 
-	ax_event_key_value_set_free(set);
+    new_timer->name = strdup(name);
+    new_timer->active = 1;
+    new_timer->repeat_rate_seconds = repeat_rate_seconds;
+    new_timer->callback = callback;
+    new_timer->next_trigger = time(NULL) + repeat_rate_seconds;
+    new_timer->next = timer_list;
+    timer_list = new_timer;
 
-	success = ax_event_handler_send_event(ACAP_EVENTS_HANDLER, event->valueint, axEvent, &error);
-	if(!success)  {
-		LOG_WARN("%s: Could not send event %s id = %d %s\n",__func__, Id, event->valueint, error->message);
-		ax_event_free(axEvent);
-		g_error_free(error);
-		return 0;
-	}
-	ax_event_free(axEvent);
-	return 1;
+    return 1;
 }
 
-cJSON*
-ACAP_EVENTS() {
-	LOG_TRACE("%s:\n",__func__);
-	//Get the ACAP package ID and Nice Name
-	cJSON* manifest = ACAP_Get_Config("manifest");
-	if(!manifest)
-		return cJSON_CreateNull();
-	cJSON* acapPackageConf = cJSON_GetObjectItem(manifest,"acapPackageConf");
-	if(!acapPackageConf)
-		return cJSON_CreateNull();
-	cJSON* setup = cJSON_GetObjectItem(acapPackageConf,"setup");
-	if(!setup)
-		return cJSON_CreateNull();
-	sprintf(ACAP_EVENTS_PACKAGE,"%s", cJSON_GetObjectItem(setup,"appName")->valuestring);
-	sprintf(ACAP_EVENTS_APPNAME,"%s", cJSON_GetObjectItem(setup,"friendlyName")->valuestring);
-	
-	LOG_TRACE("%s: %s %s\n",__func__,ACAP_EVENTS_PACKAGE,ACAP_EVENTS_APPNAME);
-
-	ACAP_EVENTS_SUBSCRIPTIONS = cJSON_CreateArray();
-	ACAP_EVENTS_DECLARATIONS = cJSON_CreateObject();
-	ACAP_EVENTS_HANDLER = ax_event_handler_new();
-	
-	cJSON* events = ACAP_FILE_Read( "html/config/events.json" );
-	if(!events)
-		LOG_WARN("Cannot load even event list\n")
-	cJSON* event = events?events->child:0;
-	while( event ) {
-		ACAP_EVENTS_Add_Event_JSON( event );
-		event = event->next;
-	}
-	return events;
+int ACAP_TIMER_Remove(const char* name) {
+    LOG_TRACE("%s: %s", __func__, name);
+    ACAP_Timer* current = timer_list;
+    ACAP_Timer* previous = NULL;
+    
+    while (current) {
+        if (strcmp(current->name, name) == 0) {
+            if (previous) {
+                previous->next = current->next;
+            } else {
+                timer_list = current->next;
+            }
+            free(current->name);
+            free(current);
+            return 1;
+        }
+        previous = current;
+        current = current->next;
+    }
+    return 1;
 }
+
+void ACAP_TIMER_Cleanup(void) {
+    LOG_TRACE("%s:", __func__);
+    
+    while (timer_list) {
+        ACAP_Timer* temp = timer_list;
+        timer_list = timer_list->next;
+        free(temp->name);
+        free(temp);
+    }
+    timer_list = NULL;
+}
+
+void ACAP_TIMER_Process(void) {
+    ACAP_Timer* current = timer_list;
+    ACAP_Timer* prev = NULL;
+    time_t now = time(NULL);
+
+    while (current) {
+        if (current->active && now >= current->next_trigger) {
+            int result = current->callback(current->name);
+        
+            if (result == 0) {
+                ACAP_Timer* to_remove = current;
+                if (prev) {
+                    prev->next = current->next;
+                    current = current->next;
+                } else {
+                    timer_list = current->next;
+                    current = timer_list;
+                }
+                free(to_remove->name);
+                free(to_remove);
+            } else {
+                current->next_trigger = now + current->repeat_rate_seconds;
+                prev = current;
+                current = current->next;
+            }
+        } else {
+            prev = current;
+            current = current->next;
+        }
+    }
+}
+
 /*------------------------------------------------------------------
  * Cleanup Implementation
  *------------------------------------------------------------------*/
 
 void ACAP_Cleanup(void) {
+    // Clean up other resources
+    ACAP_HTTP_Cleanup();
+    ACAP_TIMER_Cleanup();
+	
+    if (status_container) {
+        cJSON_Delete(status_container);
+        status_container = NULL;
+    }
+
+	LOG_TRACE("%s:",__func__);
     if (app) {
         cJSON_Delete(app);
         app = NULL;
@@ -1984,13 +2100,6 @@ void ACAP_Cleanup(void) {
         ACAP_DEVICE_Container = NULL;
     }
     
-    // Clean up other resources
-    ACAP_HTTP_Close();
-    if (status_container) {
-        cJSON_Delete(status_container);
-        status_container = NULL;
-    }
-	
     http_node_count = 0;
     ACAP_UpdateCallback = NULL;
 }
@@ -2062,3 +2171,4 @@ string_split( char* a_str,  char a_delim) {
     }
     return result;
 }
+

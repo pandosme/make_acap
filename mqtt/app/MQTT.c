@@ -158,6 +158,10 @@ MQTT_Init( const char* acapname, MQTT_Callback_Connection callback ) {
 	return 1;
 }
 
+void   MQTT_Cleanup() {
+	MQTT_Disconnect();	
+}
+
 static void
 MQTT_HTTP_callback(const ACAP_HTTP_Response response, const ACAP_HTTP_Request request) {
     if (!MQTTSettings) {

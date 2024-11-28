@@ -6,6 +6,7 @@
 #ifndef _ACAP_H_
 #define _ACAP_H_
 
+#include <glib.h>
 #include "fcgi_stdio.h"
 #include "cJSON.h"
 
@@ -18,6 +19,13 @@ extern "C" {
 #define ACAP_MAX_PATH_LENGTH 128
 #define ACAP_MAX_PACKAGE_NAME 30
 #define ACAP_MAX_BUFFER_SIZE 4096
+
+struct ACAP_TIMER {
+    char* label;
+    time_t expiry;
+    struct label_timer* next;
+};
+
 
 // Return types
 typedef enum {
@@ -54,6 +62,7 @@ typedef void (*ACAP_HTTP_Callback)(ACAP_HTTP_Response response, const ACAP_HTTP_
  *-----------------------------------------------------*/
 // Initialization and configuration
 cJSON*		ACAP(const char* package, ACAP_Config_Update updateCallback);
+gboolean	ACAP_Process(gpointer user_data);
 const char* ACAP_Name(void);
 int 		ACAP_Set_Config(const char* service, cJSON* serviceSettings);
 cJSON* 		ACAP_Get_Config(const char* service);
@@ -62,10 +71,10 @@ void		ACAP_Cleanup(void);
 /*-----------------------------------------------------
  * HTTP Functions
  *-----------------------------------------------------*/
-void 	ACAP_HTTP(void);
-int 	ACAP_HTTP_Process();
-void 	ACAP_HTTP_Close(void);
-int 	ACAP_HTTP_Node(const char* nodename, ACAP_HTTP_Callback callback);
+int 		ACAP_HTTP(void);
+void		ACAP_HTTP_Process();
+void 		ACAP_HTTP_Cleanup(void);
+int 		ACAP_HTTP_Node(const char* nodename, ACAP_HTTP_Callback callback);
 
 // HTTP Request helpers
 const char* ACAP_HTTP_Get_Method(const ACAP_HTTP_Request request);
@@ -75,24 +84,24 @@ const char* ACAP_HTTP_Request_Param(const ACAP_HTTP_Request request, const char*
 cJSON* 		ACAP_HTTP_Request_JSON(const ACAP_HTTP_Request request, const char* param);
 
 // HTTP Response helpers
-int ACAP_HTTP_Header_XML(ACAP_HTTP_Response response);
-int ACAP_HTTP_Header_JSON(ACAP_HTTP_Response response);
-int ACAP_HTTP_Header_TEXT(ACAP_HTTP_Response response);
-int ACAP_HTTP_Header_FILE(ACAP_HTTP_Response response, const char* filename, 
+int 		ACAP_HTTP_Header_XML(ACAP_HTTP_Response response);
+int 		ACAP_HTTP_Header_JSON(ACAP_HTTP_Response response);
+int 		ACAP_HTTP_Header_TEXT(ACAP_HTTP_Response response);
+int 		ACAP_HTTP_Header_FILE(ACAP_HTTP_Response response, const char* filename, 
                          const char* contenttype, unsigned filelength);
 
 // HTTP Response functions
-int ACAP_HTTP_Respond_String(ACAP_HTTP_Response response, const char* fmt, ...);
-int ACAP_HTTP_Respond_JSON(ACAP_HTTP_Response response, cJSON* object);
-int ACAP_HTTP_Respond_Data(ACAP_HTTP_Response response, size_t count, const void* data);
-int ACAP_HTTP_Respond_Error(ACAP_HTTP_Response response, int code, const char* message);
-int ACAP_HTTP_Respond_Text(ACAP_HTTP_Response response, const char* message);
+int 		ACAP_HTTP_Respond_String(ACAP_HTTP_Response response, const char* fmt, ...);
+int 		ACAP_HTTP_Respond_JSON(ACAP_HTTP_Response response, cJSON* object);
+int 		ACAP_HTTP_Respond_Data(ACAP_HTTP_Response response, size_t count, const void* data);
+int 		ACAP_HTTP_Respond_Error(ACAP_HTTP_Response response, int code, const char* message);
+int 		ACAP_HTTP_Respond_Text(ACAP_HTTP_Response response, const char* message);
 
 /*-----------------------------------------------------
 	EVENTS
   -----------------------------------------------------*/
 
-cJSON*	ACAP_EVENTS();
+cJSON*	ACAP_EVENTS(void);
 int		ACAP_EVENTS_Add_Event( const char* Id, const char* NiceName, int state );
 int		ACAP_EVENTS_Add_Event_JSON( cJSON* event );
 int		ACAP_EVENTS_Remove_Event( const char* Id );
@@ -134,6 +143,7 @@ double 		ACAP_DEVICE_Network_Average(void);
 /*-----------------------------------------------------
  * Status Management
  *-----------------------------------------------------*/
+ 
 cJSON* 		ACAP_STATUS(void);
 cJSON* 		ACAP_STATUS_Group(const char* name);
 int 		ACAP_STATUS_Bool(const char* group, const char* name);
@@ -148,6 +158,18 @@ void ACAP_STATUS_SetNumber(const char* group, const char* name, double value);
 void ACAP_STATUS_SetString(const char* group, const char* name, const char* string);
 void ACAP_STATUS_SetObject(const char* group, const char* name, cJSON* data);
 void ACAP_STATUS_SetNull(const char* group, const char* name);
+
+/*-----------------------------------------------------
+ * Timers
+ *-----------------------------------------------------*/
+#define MAX_ACAP_TIMERS 8
+typedef int (*ACAP_TIMER_Callback)(const char* name);
+
+//Add a new timer.  Returns a Timer ID
+int ACAP_TIMER_Set(const char* name, int repeat_rate_seconds, ACAP_TIMER_Callback callback);
+int ACAP_TIMER_Remove(const char* name);
+void ACAP_TIMER_Cleanup(void);
+void ACAP_TIMER_Process(void);
 
 #ifdef __cplusplus
 }

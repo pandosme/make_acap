@@ -21,7 +21,7 @@ typedef void (*MQTT_Callback_Connection) (int state);
 typedef void (*MQTT_Callback_Message) (const char *topic, const char *payload);
 
 int    MQTT_Init( const char* acapname,MQTT_Callback_Connection callback );
-void   MQTT_Ckeanup();
+void   MQTT_Cleanup();
 int    MQTT_Connect();
 int    MQTT_isConnected();
 int    MQTT_Disconnect();
