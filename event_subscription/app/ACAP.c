@@ -8,6 +8,7 @@
 #include <stdarg.h>
 #include <syslog.h>
 #include <string.h>
+#include <errno.h>
 #include <glib.h>
 #include <time.h>
 #include <math.h>
@@ -20,6 +21,7 @@
 #include <glib.h>
 #include <axsdk/axparameter.h>
 #include <axsdk/axevent.h>
+#include <pthread.h>
 #include "ACAP.h"
 
 // Logging macros
@@ -32,6 +34,16 @@
 static cJSON* app = NULL;
 static cJSON* status_container = NULL;
 
+cJSON* 		ACAP_STATUS(void);
+int			ACAP_HTTP(void);
+void		ACAP_HTTP_Process(void);
+void		ACAP_HTTP_Cleanup(void);
+cJSON*		ACAP_EVENTS(void);
+int 		ACAP_FILE_Init(void);
+cJSON* 		ACAP_DEVICE(void);
+
+static void ACAP_ENDPOINT_settings(const ACAP_HTTP_Response response, const ACAP_HTTP_Request request);
+static void ACAP_ENDPOINT_app(const ACAP_HTTP_Response response, const ACAP_HTTP_Request request);
 static char ACAP_package_name[ACAP_MAX_PACKAGE_NAME];
 static ACAP_Config_Update ACAP_UpdateCallback = NULL;
 
@@ -39,13 +51,85 @@ static ACAP_Config_Update ACAP_UpdateCallback = NULL;
 /*-----------------------------------------------------
  * Core Functions Implementation
  *-----------------------------------------------------*/
-gboolean
-ACAP_Process(gpointer user_data) {
-	(void)user_data;
-    ACAP_HTTP_Process();
-//    ACAP_TIMER_Process();
-	return G_SOURCE_CONTINUE;
+
+
+cJSON* ACAP(const char* package, ACAP_Config_Update callback) {
+    if (!package) {
+        LOG_WARN("Invalid package name\n");
+        return NULL;
+    }
+
+    
+    LOG_TRACE("%s: Initializing ACAP for package %s\n", __func__, package);
+    
+    // Store package name
+    strncpy(ACAP_package_name, package, ACAP_MAX_PACKAGE_NAME - 1);
+    ACAP_package_name[ACAP_MAX_PACKAGE_NAME - 1] = '\0';
+    
+    // Initialize subsystems
+    if (!ACAP_FILE_Init()) {
+        LOG_WARN("Failed to initialize file system\n");
+        return NULL;
+    }
+
+    // Store callback
+    ACAP_UpdateCallback = callback;
+
+    // Create main app object
+    app = cJSON_CreateObject();
+    if (!app) {
+        LOG_WARN("Failed to create app object\n");
+        return NULL;
+    }
+
+    // Load manifest
+    cJSON* manifest = ACAP_FILE_Read("manifest.json");
+    if (manifest) {
+        cJSON_AddItemToObject(app, "manifest", manifest);
+    }
+
+    // Load and merge settings
+    cJSON* settings = ACAP_FILE_Read("settings/settings.json");
+    if (!settings) {
+        settings = cJSON_CreateObject();
+    }
+    
+    cJSON* savedSettings = ACAP_FILE_Read("localdata/settings.json");
+    if (savedSettings) {
+        cJSON* prop = savedSettings->child;
+        while (prop) {
+            if (cJSON_GetObjectItem(settings, prop->string)) {
+                cJSON_ReplaceItemInObject(settings, prop->string, 
+                                        cJSON_Duplicate(prop, 1));
+            }
+            prop = prop->next;
+        }
+        cJSON_Delete(savedSettings);
+    }
+
+    cJSON_AddItemToObject(app, "settings", settings);
+
+    // Initialize subsystems
+    ACAP_EVENTS();
+	ACAP_HTTP();
+    
+    // Register core services
+    ACAP_Set_Config("status", ACAP_STATUS());
+    ACAP_Set_Config("device", ACAP_DEVICE());
+    
+    // Register core endpoints
+    ACAP_HTTP_Node("app", ACAP_ENDPOINT_app);
+    ACAP_HTTP_Node("settings", ACAP_ENDPOINT_settings);
+
+    // Notify about settings
+    if (ACAP_UpdateCallback) {
+        ACAP_UpdateCallback("settings", settings);
+    }
+
+    LOG_TRACE("%s: Initialization complete\n", __func__);
+    return settings;
 }
+
 
 static void
 ACAP_ENDPOINT_app(const ACAP_HTTP_Response response, const ACAP_HTTP_Request request) {
@@ -130,84 +214,7 @@ ACAP_ENDPOINT_settings(const ACAP_HTTP_Response response, const ACAP_HTTP_Reques
 const char* ACAP_Name(void) {
 	return ACAP_package_name;
 }
-
  
-cJSON* ACAP(const char* package, ACAP_Config_Update callback) {
-    if (!package) {
-        LOG_WARN("Invalid package name\n");
-        return NULL;
-    }
-
-    
-    LOG_TRACE("%s: Initializing ACAP for package %s\n", __func__, package);
-    
-    // Store package name
-    strncpy(ACAP_package_name, package, ACAP_MAX_PACKAGE_NAME - 1);
-    ACAP_package_name[ACAP_MAX_PACKAGE_NAME - 1] = '\0';
-    
-    // Initialize subsystems
-    if (!ACAP_FILE_Init()) {
-        LOG_WARN("Failed to initialize file system\n");
-        return NULL;
-    }
-
-    // Store callback
-    ACAP_UpdateCallback = callback;
-
-    // Create main app object
-    app = cJSON_CreateObject();
-    if (!app) {
-        LOG_WARN("Failed to create app object\n");
-        return NULL;
-    }
-
-    // Load manifest
-    cJSON* manifest = ACAP_FILE_Read("manifest.json");
-    if (manifest) {
-        cJSON_AddItemToObject(app, "manifest", manifest);
-    }
-
-    // Load and merge settings
-    cJSON* settings = ACAP_FILE_Read("html/config/settings.json");
-    if (!settings) {
-        settings = cJSON_CreateObject();
-    }
-    
-    cJSON* savedSettings = ACAP_FILE_Read("localdata/settings.json");
-    if (savedSettings) {
-        cJSON* prop = savedSettings->child;
-        while (prop) {
-            if (cJSON_GetObjectItem(settings, prop->string)) {
-                cJSON_ReplaceItemInObject(settings, prop->string, 
-                                        cJSON_Duplicate(prop, 1));
-            }
-            prop = prop->next;
-        }
-        cJSON_Delete(savedSettings);
-    }
-
-    cJSON_AddItemToObject(app, "settings", settings);
-
-    // Initialize subsystems
-    ACAP_HTTP();
-    ACAP_EVENTS();
-    
-    // Register core services
-    ACAP_Set_Config("status", ACAP_STATUS());
-    ACAP_Set_Config("device", ACAP_DEVICE());
-    
-    // Register core endpoints
-    ACAP_HTTP_Node("app", ACAP_ENDPOINT_app);
-    ACAP_HTTP_Node("settings", ACAP_ENDPOINT_settings);
-
-    // Notify about settings
-    if (ACAP_UpdateCallback) {
-        ACAP_UpdateCallback("settings", settings);
-    }
-
-    LOG_TRACE("%s: Initialization complete\n", __func__);
-    return settings;
-}
 
 int
 ACAP_Set_Config(const char* service, cJSON* serviceSettings ) {
@@ -234,10 +241,23 @@ ACAP_Get_Config(const char* service) {
  * HTTP Request Processing Implementation
  *------------------------------------------------------------------*/
 
+static pthread_t http_thread;
+static int http_thread_running = 0; // Flag to track thread state
+static pthread_mutex_t http_nodes_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 typedef struct {
     char path[ACAP_MAX_PATH_LENGTH];
     ACAP_HTTP_Callback callback;
 } HTTPNode;
+
+// Thread function for FastCGI processing
+void* fastcgi_thread_func(void* arg) {
+    while (http_thread_running) {
+        ACAP_HTTP_Process(); // Process FastCGI requests
+    }
+	LOG_TRACE("%s: Exit\n",__func__);
+    return NULL;
+}
 
 static int initialized = 0;
 static int fcgi_sock = -1;
@@ -261,23 +281,43 @@ static const char* get_path_without_query(const char* uri) {
     return uri;
 }
 
-int
-ACAP_HTTP() {
+int ACAP_HTTP() {
+	LOG_TRACE("%s:\n",__func__);
     if (!initialized) {
         if (FCGX_Init() != 0) {
             LOG_WARN("Failed to initialize FCGI\n");
             return 0;
         }
         initialized = 1;
+
+        // Start the FastCGI thread
+        http_thread_running = 1;
+        if (pthread_create(&http_thread, NULL, fastcgi_thread_func, NULL) != 0) {
+            LOG_WARN("Failed to create FastCGI thread\n");
+            initialized = 0; // Roll back initialization
+            return 0;
+        }
     }
-	return 1;
+    return 1;
 }
 
 void ACAP_HTTP_Cleanup() {
-	LOG_TRACE("%s:",__func__);
+    LOG_TRACE("%s:", __func__);
+
+	if(!initialized)
+		return;
+
+    // Close the FastCGI socket
     if (fcgi_sock != -1) {
         close(fcgi_sock);
         fcgi_sock = -1;
+    }
+
+    // Stop the FastCGI thread
+    if (http_thread_running) {
+        http_thread_running = 0; // Signal the thread to stop
+		pthread_cancel(http_thread); // Request cancellation
+        pthread_join(http_thread, NULL); // Wait for the thread to finish
     }
     initialized = 0;
 }
@@ -305,13 +345,15 @@ size_t ACAP_HTTP_Get_Content_Length(const ACAP_HTTP_Request request) {
 }
 
 int ACAP_HTTP_Node(const char *nodename, ACAP_HTTP_Callback callback) {
+    pthread_mutex_lock(&http_nodes_mutex); // Lock the mutex
+
     // Prevent buffer overflow
     if (http_node_count >= ACAP_MAX_HTTP_NODES) {
         LOG_WARN("Maximum HTTP nodes reached");
+        pthread_mutex_unlock(&http_nodes_mutex); // Unlock the mutex
         return 0;
     }
-	LOG_TRACE("%s: %s\n",__func__,nodename);
-	
+
     // Construct full path
     char full_path[ACAP_MAX_PATH_LENGTH];
     if (nodename[0] == '/') {
@@ -324,18 +366,19 @@ int ACAP_HTTP_Node(const char *nodename, ACAP_HTTP_Callback callback) {
     for (int i = 0; i < http_node_count; i++) {
         if (strcmp(http_nodes[i].path, full_path) == 0) {
             LOG_WARN("Duplicate HTTP node path: %s", full_path);
+            pthread_mutex_unlock(&http_nodes_mutex); // Unlock the mutex
             return 0;
         }
     }
 
     // Add new node
-	snprintf(http_nodes[http_node_count].path, ACAP_MAX_PATH_LENGTH, "%s", full_path);
-	http_nodes[http_node_count].callback = callback;
-	http_node_count++;
+    snprintf(http_nodes[http_node_count].path, ACAP_MAX_PATH_LENGTH, "%s", full_path);
+    http_nodes[http_node_count].callback = callback;
+    http_node_count++;
 
+    pthread_mutex_unlock(&http_nodes_mutex); // Unlock the mutex
     return 1;
 }
-
 
 void ACAP_HTTP_Process() {
 	FCGX_Request request;
@@ -1204,10 +1247,12 @@ int ACAP_FILE_Init(void) {
 }
 
 FILE* ACAP_FILE_Open(const char* filepath, const char* mode) {
-    if (!filepath || !mode) {
+    if (!filepath ) {
         LOG_WARN("Invalid parameters for file operation\n");
         return NULL;
     }
+
+	LOG_TRACE("%s: %s\n", __func__, filepath);
 
     char fullpath[ACAP_MAX_PATH_LENGTH];
     if (snprintf(fullpath, sizeof(fullpath), "%s%s", ACAP_FILE_Path, filepath) >= sizeof(fullpath)) {
@@ -1217,7 +1262,7 @@ FILE* ACAP_FILE_Open(const char* filepath, const char* mode) {
     
     FILE* file = fopen(fullpath, mode);
     if (!file) {
-        LOG_TRACE("%s: Opening file %s failed\n", __func__, fullpath);
+        LOG_WARN("%s: Opening file %s failed: %s\n", __func__, fullpath, strerror(errno));
     }
     return file;
 }
@@ -1238,6 +1283,7 @@ int ACAP_FILE_Delete(const char* filepath) {
 }
 
 cJSON* ACAP_FILE_Read(const char* filepath) {
+	LOG_TRACE("%s: %s\n",__func__,filepath);
     if (!filepath) {
         LOG_WARN("Invalid filepath\n");
         return NULL;
@@ -1245,6 +1291,7 @@ cJSON* ACAP_FILE_Read(const char* filepath) {
 
     FILE* file = ACAP_FILE_Open(filepath, "r");
     if (!file) {
+		LOG_WARN("%s: File open error %s\n",__func__,filepath);
         return NULL;
     }
 
@@ -1254,7 +1301,7 @@ cJSON* ACAP_FILE_Read(const char* filepath) {
     fseek(file, 0, SEEK_SET);
 
     if (size < 2) {
-        LOG_WARN("File size error in %s\n", filepath);
+        LOG_WARN("%s: File size error in %s\n", __func__, filepath);
         fclose(file);
         return NULL;
     }
@@ -1324,7 +1371,7 @@ int ACAP_FILE_Write(const char* filepath, cJSON* object) {
  *------------------------------------------------------------------*/
 
 ACAP_EVENTS_Callback EVENT_USER_CALLBACK = 0;
-static void ACAP_EVENTS_Main_Callback(guint subscription, AXEvent *axEvent, cJSON* event);
+static void ACAP_EVENTS_Main_Callback(guint subscription, AXEvent *event, gpointer user_data);
 cJSON* ACAP_EVENTS_SUBSCRIPTIONS = 0;
 cJSON* ACAP_EVENTS_DECLARATIONS = 0;
 AXEventHandler *ACAP_EVENTS_HANDLER = 0;
@@ -1389,7 +1436,7 @@ ACAP_EVENTS() {
 	ACAP_EVENTS_DECLARATIONS = cJSON_CreateObject();
 	ACAP_EVENTS_HANDLER = ax_event_handler_new();
 	
-	cJSON* events = ACAP_FILE_Read( "html/config/events.json" );
+	cJSON* events = ACAP_FILE_Read( "settings/events.json" );
 	if(!events)
 		LOG_WARN("Cannot load even event list\n")
 	cJSON* event = events?events->child:0;
@@ -1552,16 +1599,35 @@ ACAP_EVENTS_Parse( AXEvent *axEvent ) {
 	return object;
 }
 
+
+// gpointer points to the name used when subscribing to event
 static void
-ACAP_EVENTS_Main_Callback(guint subscription, AXEvent *axEvent, cJSON* event) {
-	LOG_TRACE("%s: Entry\n",__func__);
+ACAP_EVENTS_Main_Callback(guint subscription, AXEvent *axEvent, gpointer user_data) {
+	LOG_TRACE("%s:\n",__func__);
 
 	cJSON* eventData = ACAP_EVENTS_Parse(axEvent);
+	if( user_data )
+		cJSON_AddStringToObject(eventData,"name",(char *)user_data);
+	else {
+		cJSON_AddStringToObject(eventData,"name","Undefined");
+	}
 	if( !eventData )
 		return;
 	if( EVENT_USER_CALLBACK )
 		EVENT_USER_CALLBACK( eventData );
+	cJSON_Delete(eventData);
 }
+
+/*
+event structure
+{
+	"name": "All ACAP Events",
+	"topic0": {"tnsaxis":"CameraApplicationPlatform"},
+	"topic1": {"tnsaxis":"someService"},
+	"topic2": {"tnsaxis":"someEvent"}
+}
+ 
+*/
 
 int
 ACAP_EVENTS_Subscribe( cJSON *event ) {
@@ -1569,26 +1635,39 @@ ACAP_EVENTS_Subscribe( cJSON *event ) {
 	cJSON *topic;
 	guint declarationID = 0;
 	int result;
-	
-	if( !event ) {
-		LOG_WARN("ACAP_EVENTS_Subscribe: Invalid event\n")
+
+	if(!ACAP_EVENTS_HANDLER) {
+		LOG_WARN("%s: Event handler not initialize\n",__func__);
 		return 0;
 	}
 
-	char* json = cJSON_PrintUnformatted(event);
+	char *json = cJSON_PrintUnformatted(event);
 	if( json ) {
 		LOG_TRACE("%s: %s\n",__func__,json);
 		free(json);
 	}
 
+	if( !event ) {
+		LOG_WARN("%s: Invalid event\n",__func__);
+		return 0;
+	}
+
+
+	if( !cJSON_GetObjectItem( event,"name" ) || !cJSON_GetObjectItem( event,"name" )->valuestring || !strlen(cJSON_GetObjectItem( event,"name" )->valuestring) ) {
+		LOG_WARN("%s: Event declaration is missing name\n",__func__);
+		return 0;
+	}
 
 	if( !cJSON_GetObjectItem( event,"topic0" ) ) {
-		LOG_WARN("ACAP_EVENTS_Subscribe: Producer event has no topic0\n");
+		LOG_WARN("%s: Event declaration is missing topic0\n",__func__);
 		return 0;
 	}
 	
 	keyset = ax_event_key_value_set_new();
-	if( !keyset ) {	LOG_WARN("ACAP_EVENTS_Subscribe: Unable to create keyset\n"); return 0;}
+	if( !keyset ) {
+		LOG_WARN("ACAP_EVENTS_Subscribe: Unable to create keyset\n");
+		return 0;
+	}
 
 
 	// ----- TOPIC 0 ------
@@ -1597,75 +1676,99 @@ ACAP_EVENTS_Subscribe( cJSON *event ) {
 		LOG_WARN("ACAP_EVENTS_Subscribe: Invalid tag for topic 0");
 		return 0;
 	}
-	result = ax_event_key_value_set_add_key_value( keyset, "topic0", topic->child->string, topic->child->valuestring, AX_VALUE_TYPE_STRING,NULL);
-	if( !result ) {
+	if( !ax_event_key_value_set_add_key_value( keyset, "topic0", topic->child->string, topic->child->valuestring, AX_VALUE_TYPE_STRING,NULL) ) {
 		LOG_WARN("ACAP_EVENTS_Subscribe: Topic 0 keyset error");
 		ax_event_key_value_set_free(keyset);
 		return 0;
 	}
-	LOG_TRACE("%s: TOPIC0 %s:%s\n",__func__, topic->child->string, topic->child->valuestring );
+	LOG_TRACE("%s: topic0 %s:%s\n",__func__, topic->child->string, topic->child->valuestring );
 	
 	// ----- TOPIC 1 ------
 	if( cJSON_GetObjectItem( event,"topic1" ) ) {
 		topic = cJSON_GetObjectItem( event,"topic1" );
-		result = ax_event_key_value_set_add_key_value( keyset, "topic1", topic->child->string, topic->child->valuestring, AX_VALUE_TYPE_STRING,NULL);
-		if( !result ) {
+		if( !ax_event_key_value_set_add_key_value( keyset, "topic1", topic->child->string, topic->child->valuestring, AX_VALUE_TYPE_STRING,NULL) ) {
 			LOG_WARN("ACAP_EVENTS_Subscribe: Unable to subscribe to event (1)");
 			ax_event_key_value_set_free(keyset);
 			return 0;
 		}
-		LOG_TRACE("%s: TOPIC1 %s:%s\n",__func__, topic->child->string, topic->child->valuestring );
+		LOG_TRACE("%s: topic1 %s:%s\n",__func__, topic->child->string, topic->child->valuestring );
 	}
 	//------ TOPIC 2 -------------
 	if( cJSON_GetObjectItem( event,"topic2" ) ) {
 		topic = cJSON_GetObjectItem( event,"topic2" );
-		result = ax_event_key_value_set_add_key_value( keyset, "topic2", topic->child->string, topic->child->valuestring, AX_VALUE_TYPE_STRING,NULL);
-		if( !result ) {
+		if( !ax_event_key_value_set_add_key_value( keyset, "topic2", topic->child->string, topic->child->valuestring, AX_VALUE_TYPE_STRING,NULL) ) {
 			LOG_WARN("ACAP_EVENTS_Subscribe: Unable to subscribe to event (2)");
 			ax_event_key_value_set_free(keyset);
 			return 0;
 		}
-		LOG_TRACE("%s: TOPIC2 %s:%s\n",__func__, topic->child->string, topic->child->valuestring );
+		LOG_TRACE("%s: topic2 %s:%s\n",__func__, topic->child->string, topic->child->valuestring );
 	}
 	
 	if( cJSON_GetObjectItem( event,"topic3" ) ) {
+		LOG_TRACE("%s: topic3:%s:%s", __func__,topic->child->string,topic->child->valuestring);
 		topic = cJSON_GetObjectItem( event,"topic3" );
-		result = ax_event_key_value_set_add_key_value( keyset, "topic3", topic->child->string, topic->child->valuestring, AX_VALUE_TYPE_STRING,NULL);
-		if( !result ) {
+		if( !ax_event_key_value_set_add_key_value( keyset, "topic3", topic->child->string, topic->child->valuestring, AX_VALUE_TYPE_STRING,NULL) ) {
 			LOG_WARN("ACAP_EVENTS_Subscribe: Unable to subscribe to event (3)");
 			ax_event_key_value_set_free(keyset);
 			return 0;
 		}
-		LOG_TRACE("%s: TOPIC3 %s %s\n",__func__, topic->child->string, topic->child->valuestring );
+		LOG_TRACE("%s: topic3 %s %s\n",__func__, topic->child->string, topic->child->valuestring );
 	}
-	int ax = ax_event_handler_subscribe( ACAP_EVENTS_HANDLER, keyset, &(declarationID),(AXSubscriptionCallback)ACAP_EVENTS_Main_Callback,(gpointer)event,NULL);
+	int ax = ax_event_handler_subscribe(
+		ACAP_EVENTS_HANDLER, 
+		keyset, 
+		&declarationID,
+		ACAP_EVENTS_Main_Callback,
+		cJSON_GetObjectItem( event,"name" )->valuestring,
+		NULL
+	);
+	
 	ax_event_key_value_set_free(keyset);
 	if( !ax ) {
 		LOG_WARN("ACAP_EVENTS_Subscribe: Unable to subscribe to event\n");
 		return 0;
 	}
 	cJSON_AddItemToArray(ACAP_EVENTS_SUBSCRIPTIONS,cJSON_CreateNumber(declarationID));
-	if( cJSON_GetObjectItem(event,"id") )
-		cJSON_ReplaceItemInObject( event,"subid",cJSON_CreateNumber(declarationID));
-	else
-		cJSON_AddNumberToObject(event,"subid",declarationID);
-	LOG_TRACE("Event subsription %d OK\n",declarationID);
 	return declarationID;
 }
 
-int
-ACAP_EVENTS_Unsubscribe() {
-	LOG_TRACE("ACAP_EVENTS_Unsubscribe\n");
-	if(!ACAP_EVENTS_SUBSCRIPTIONS)
-		return 0;
-	cJSON* event = ACAP_EVENTS_SUBSCRIPTIONS->child;
-	while( event ) {
-		ax_event_handler_unsubscribe( ACAP_EVENTS_HANDLER, (guint)event->valueint, 0);
-		event = event->next;
-	};
-	cJSON_Delete( ACAP_EVENTS_SUBSCRIPTIONS );
-	ACAP_EVENTS_SUBSCRIPTIONS = cJSON_CreateArray();
-	return 1;
+int ACAP_EVENTS_Unsubscribe(int id) {
+    LOG_TRACE("%s: Unsubscribing id=%d\n", __func__, id);
+    
+    if (!ACAP_EVENTS_SUBSCRIPTIONS) {
+        return 0;
+    }
+
+    if (id == 0) {  // Unsubscribe all
+        cJSON* event = ACAP_EVENTS_SUBSCRIPTIONS->child;
+        while (event) {
+            ax_event_handler_unsubscribe(ACAP_EVENTS_HANDLER, (guint)event->valueint, 0);
+            event = event->next;
+        }
+        cJSON_Delete(ACAP_EVENTS_SUBSCRIPTIONS);
+        ACAP_EVENTS_SUBSCRIPTIONS = cJSON_CreateArray();
+    } else {
+        // Find and remove specific subscription
+        cJSON* event = ACAP_EVENTS_SUBSCRIPTIONS->child;
+        cJSON* prev = NULL;
+        
+        while (event) {
+            if (event->valueint == id) {
+                ax_event_handler_unsubscribe(ACAP_EVENTS_HANDLER, (guint)id, 0);
+                if (prev) {
+                    prev->next = event->next;
+                } else {
+                    ACAP_EVENTS_SUBSCRIPTIONS->child = event->next;
+                }
+                cJSON_Delete(event);
+                break;
+            }
+            prev = event;
+            event = event->next;
+        }
+    }
+    
+    return 1;
 }
 
 
@@ -1966,123 +2069,12 @@ ACAP_EVENTS_Add_Event_JSON( cJSON* event ) {
 }
 
 /*------------------------------------------------------------------
- * Timer functions
- *------------------------------------------------------------------*/
-
-typedef struct ACAP_Timer {
-    char* name;
-    int active;
-    int repeat_rate_seconds;
-    time_t next_trigger;
-    ACAP_TIMER_Callback callback;
-    struct ACAP_Timer* next;
-} ACAP_Timer;
-
-static ACAP_Timer* timer_list = NULL;
-
-int ACAP_TIMER_Set(const char* name, int repeat_rate_seconds, ACAP_TIMER_Callback callback) {
-    LOG_TRACE("%s: %s %d seconds", __func__, name, repeat_rate_seconds);
-    ACAP_Timer* existing = timer_list;
-    
-    while (existing) {
-        if (strcmp(existing->name, name) == 0) {
-            existing->repeat_rate_seconds = repeat_rate_seconds;
-            existing->callback = callback;
-            existing->next_trigger = time(NULL) + repeat_rate_seconds;
-            existing->active = 1;
-            return 1;
-        }
-        existing = existing->next;
-    }
-
-    ACAP_Timer* new_timer = (ACAP_Timer*)malloc(sizeof(ACAP_Timer));
-    if (!new_timer) return 0;
-
-    new_timer->name = strdup(name);
-    new_timer->active = 1;
-    new_timer->repeat_rate_seconds = repeat_rate_seconds;
-    new_timer->callback = callback;
-    new_timer->next_trigger = time(NULL) + repeat_rate_seconds;
-    new_timer->next = timer_list;
-    timer_list = new_timer;
-
-    return 1;
-}
-
-int ACAP_TIMER_Remove(const char* name) {
-    LOG_TRACE("%s: %s", __func__, name);
-    ACAP_Timer* current = timer_list;
-    ACAP_Timer* previous = NULL;
-    
-    while (current) {
-        if (strcmp(current->name, name) == 0) {
-            if (previous) {
-                previous->next = current->next;
-            } else {
-                timer_list = current->next;
-            }
-            free(current->name);
-            free(current);
-            return 1;
-        }
-        previous = current;
-        current = current->next;
-    }
-    return 1;
-}
-
-void ACAP_TIMER_Cleanup(void) {
-    LOG_TRACE("%s:", __func__);
-    
-    while (timer_list) {
-        ACAP_Timer* temp = timer_list;
-        timer_list = timer_list->next;
-        free(temp->name);
-        free(temp);
-    }
-    timer_list = NULL;
-}
-
-void ACAP_TIMER_Process(void) {
-    ACAP_Timer* current = timer_list;
-    ACAP_Timer* prev = NULL;
-    time_t now = time(NULL);
-
-    while (current) {
-        if (current->active && now >= current->next_trigger) {
-            int result = current->callback(current->name);
-        
-            if (result == 0) {
-                ACAP_Timer* to_remove = current;
-                if (prev) {
-                    prev->next = current->next;
-                    current = current->next;
-                } else {
-                    timer_list = current->next;
-                    current = timer_list;
-                }
-                free(to_remove->name);
-                free(to_remove);
-            } else {
-                current->next_trigger = now + current->repeat_rate_seconds;
-                prev = current;
-                current = current->next;
-            }
-        } else {
-            prev = current;
-            current = current->next;
-        }
-    }
-}
-
-/*------------------------------------------------------------------
  * Cleanup Implementation
  *------------------------------------------------------------------*/
 
 void ACAP_Cleanup(void) {
     // Clean up other resources
     ACAP_HTTP_Cleanup();
-    ACAP_TIMER_Cleanup();
 	
     if (status_container) {
         cJSON_Delete(status_container);

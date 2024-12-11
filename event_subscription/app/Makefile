@@ -6,7 +6,7 @@ PKGS = glib-2.0 gio-2.0 vdostream axevent fcgi
 
 CFLAGS += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --cflags $(PKGS))
 LDLIBS += $(shell PKG_CONFIG_PATH=$(PKG_CONFIG_PATH) pkg-config --libs $(PKGS))
-LDLIBS  += -s -lm -ldl -laxparameter
+LDLIBS  += -s -lm -ldl -laxparameter -lpthread
 
 all:	$(PROGS)
 

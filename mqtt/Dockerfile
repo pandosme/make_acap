@@ -6,6 +6,15 @@ ARG SDK=acap-native-sdk
 
 FROM ${REPO}/${SDK}:${VERSION}-${ARCH}-ubuntu${UBUNTU_VERSION}
 
+#-------------------------------------------------------------------------------
+# Build ACAP application
+#-------------------------------------------------------------------------------
+
 WORKDIR /opt/app
 COPY ./app .
-RUN . /opt/axis/acapsdk/environment-setup* && acap-build .
+ARG CHIP=
+
+RUN . /opt/axis/acapsdk/environment-setup* && acap-build . \
+	-a 'settings/settings.json' \
+	-a 'settings/events.json' \
+	-a 'settings/mqtt.json'

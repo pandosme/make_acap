@@ -2,13 +2,13 @@
     "schemaVersion": "1.7.1",
     "acapPackageConf": {
         "setup": {
-            "friendlyName": "Base MQTT",
+            "friendlyName": "MQTT",
             "appName": "basemqtt",
             "vendor": "Fred Juhlin",
             "embeddedSdkVersion": "3.0",
             "vendorUrl": "https://pandosme.github.io",
             "runMode": "once",
-            "version": "4.0.0"
+            "version": "4.1.0"
         },
         "configuration": {
 			"settingPage": "index.html",

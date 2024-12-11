@@ -5,7 +5,7 @@
 #include <glib.h>
 #include <glib-unix.h>
 #include <signal.h>
-
+#include <axsdk/axevent.h>
 #include "ACAP.h"
 #include "cJSON.h"
 
@@ -16,7 +16,8 @@
 #define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
 //#define LOG_TRACE(fmt, args...)    {}
 
-void My_Event_Callback(cJSON *event) {
+void
+My_Event_Callback(cJSON *event) {
 	char* json = cJSON_PrintUnformatted(event);
 	LOG("%s: %s\n", __func__,json);
 	free(json);
@@ -33,22 +34,24 @@ signal_handler(gpointer user_data) {
     return G_SOURCE_REMOVE;
 }
 
+
+cJSON* eventSubscriptions = 0;
+
 int main(void) {
 	openlog(APP_PACKAGE, LOG_PID|LOG_CONS, LOG_USER);
     LOG("------ Starting ACAP Service ------\n");
+
 	
 	ACAP( APP_PACKAGE, NULL );  //No configuration parameters
 
+	//Add Event subscriptions
 	ACAP_EVENTS_SetCallback( My_Event_Callback );
-	cJSON* list = ACAP_FILE_Read( "html/config/subscriptions.json" );
-	cJSON* event = list->child;
-	while(event){
-		ACAP_EVENTS_Subscribe(event);
-		event = event->next;
+	eventSubscriptions = ACAP_FILE_Read( "settings/subscriptions.json" );
+	cJSON* subscription = eventSubscriptions?eventSubscriptions->child:0;
+	while(subscription){
+		ACAP_EVENTS_Subscribe(subscription);
+		subscription = subscription->next;
 	}
-	cJSON_Delete(list);
-	
-	g_idle_add(ACAP_Process, NULL);
 
     LOG("Entering main loop\n");
 	main_loop = g_main_loop_new(NULL, FALSE);
@@ -59,6 +62,7 @@ int main(void) {
 	} else {
 		LOG_WARN("Signal detection failed");
 	}
+	
     g_main_loop_run(main_loop);
 	LOG("Terminating and cleaning up %s\n",APP_PACKAGE);
     ACAP_Cleanup();

@@ -152,8 +152,6 @@ int main(void) {
     ACAP(APP_PACKAGE, Settings_Updated_Callback);
     ACAP_HTTP_Node("capture", HTTP_Endpoint_capture);
     ACAP_HTTP_Node("fire", HTTP_Endpoint_fire);
-
-    g_idle_add(ACAP_Process, NULL);
     
     LOG("Entering main loop\n");
 	main_loop = g_main_loop_new(NULL, FALSE);

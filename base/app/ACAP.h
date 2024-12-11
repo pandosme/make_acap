@@ -20,12 +20,6 @@ extern "C" {
 #define ACAP_MAX_PACKAGE_NAME 30
 #define ACAP_MAX_BUFFER_SIZE 4096
 
-struct ACAP_TIMER {
-    char* label;
-    time_t expiry;
-    struct label_timer* next;
-};
-
 
 // Return types
 typedef enum {
@@ -62,7 +56,6 @@ typedef void (*ACAP_HTTP_Callback)(ACAP_HTTP_Response response, const ACAP_HTTP_
  *-----------------------------------------------------*/
 // Initialization and configuration
 cJSON*		ACAP(const char* package, ACAP_Config_Update updateCallback);
-gboolean	ACAP_Process(gpointer user_data);
 const char* ACAP_Name(void);
 int 		ACAP_Set_Config(const char* service, cJSON* serviceSettings);
 cJSON* 		ACAP_Get_Config(const char* service);
@@ -71,9 +64,6 @@ void		ACAP_Cleanup(void);
 /*-----------------------------------------------------
  * HTTP Functions
  *-----------------------------------------------------*/
-int 		ACAP_HTTP(void);
-void		ACAP_HTTP_Process();
-void 		ACAP_HTTP_Cleanup(void);
 int 		ACAP_HTTP_Node(const char* nodename, ACAP_HTTP_Callback callback);
 
 // HTTP Request helpers
@@ -101,7 +91,6 @@ int 		ACAP_HTTP_Respond_Text(ACAP_HTTP_Response response, const char* message);
 	EVENTS
   -----------------------------------------------------*/
 
-cJSON*	ACAP_EVENTS(void);
 int		ACAP_EVENTS_Add_Event( const char* Id, const char* NiceName, int state );
 int		ACAP_EVENTS_Add_Event_JSON( cJSON* event );
 int		ACAP_EVENTS_Remove_Event( const char* Id );
@@ -114,7 +103,6 @@ int		ACAP_EVENTS_Subscribe( cJSON* eventDeclaration );
 /*-----------------------------------------------------
  * File Operations
  *-----------------------------------------------------*/
-int 		ACAP_FILE_Init(void);
 const char* ACAP_FILE_AppPath(void);
 FILE* 		ACAP_FILE_Open(const char* filepath, const char* mode);
 int 		ACAP_FILE_Delete(const char* filepath);
@@ -126,7 +114,6 @@ int 		ACAP_FILE_Exists(const char* filepath);
 /*-----------------------------------------------------
  * Device Information
  *-----------------------------------------------------*/
-cJSON* 		ACAP_DEVICE(void);
 const char* ACAP_DEVICE_Prop(const char* name);
 int 		ACAP_DEVICE_Prop_Int(const char* name);
 cJSON* 		ACAP_DEVICE_JSON(const char* name);
@@ -144,7 +131,6 @@ double 		ACAP_DEVICE_Network_Average(void);
  * Status Management
  *-----------------------------------------------------*/
  
-cJSON* 		ACAP_STATUS(void);
 cJSON* 		ACAP_STATUS_Group(const char* name);
 int 		ACAP_STATUS_Bool(const char* group, const char* name);
 int 		ACAP_STATUS_Int(const char* group, const char* name);
@@ -159,17 +145,6 @@ void ACAP_STATUS_SetString(const char* group, const char* name, const char* stri
 void ACAP_STATUS_SetObject(const char* group, const char* name, cJSON* data);
 void ACAP_STATUS_SetNull(const char* group, const char* name);
 
-/*-----------------------------------------------------
- * Timers
- *-----------------------------------------------------*/
-#define MAX_ACAP_TIMERS 8
-typedef int (*ACAP_TIMER_Callback)(const char* name);
-
-//Add a new timer.  Returns a Timer ID
-int ACAP_TIMER_Set(const char* name, int repeat_rate_seconds, ACAP_TIMER_Callback callback);
-int ACAP_TIMER_Remove(const char* name);
-void ACAP_TIMER_Cleanup(void);
-void ACAP_TIMER_Process(void);
 
 #ifdef __cplusplus
 }

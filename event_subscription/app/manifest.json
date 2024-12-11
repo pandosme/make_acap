@@ -2,7 +2,7 @@
     "schemaVersion": "1.7.1",
     "acapPackageConf": {
         "setup": {
-            "friendlyName": "Base Event Subscription",
+            "friendlyName": "Event Subscription",
             "appName": "event_subscription",
             "vendor": "Fred Juhlin",
             "embeddedSdkVersion": "3.0",

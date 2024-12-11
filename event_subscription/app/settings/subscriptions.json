@@ -3,7 +3,6 @@
 		"name": "All ACAP Events",
 		"topic0": {"tnsaxis":"CameraApplicationPlatform"}
 	},
-	},
 	{
 		"name": "Camera Day and Night Switching",
 		"topic0": {"tns1":"VideoSource"},

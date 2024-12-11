@@ -106,7 +106,7 @@ MQTT_Init( const char* acapname, MQTT_Callback_Connection callback ) {
 	}
 	
 	if( !MQTTSettings ) {
-		MQTTSettings = ACAP_FILE_Read( "html/config/mqtt.json" );
+		MQTTSettings = ACAP_FILE_Read( "settings/mqtt.json" );
 		if(!MQTTSettings) {
 			LOG_WARN("%s: Unable to parse default settings\n",__func__);
 			return 0;

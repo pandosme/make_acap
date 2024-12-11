@@ -111,9 +111,8 @@ main(void) {
 	ACAP_HTTP_Node("publish", HTTP_ENDPOINT_Publish );
 
 	MQTT_Init( APP_PACKAGE, Connection_Status );
-	MQTT_Subscribe( "base_mqtt", Subscription );
+	MQTT_Subscribe( "mqtt", Subscription );
 	
-	g_idle_add(ACAP_Process, NULL);
 	main_loop = g_main_loop_new(NULL, FALSE);
     GSource *signal_source = g_unix_signal_source_new(SIGTERM);
     if (signal_source) {

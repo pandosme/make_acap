@@ -54,10 +54,10 @@ Detailed information can be found at https://axiscommunications.github.io/acap-d
 │   ├── main.c
 │   ├── cJSON.c
 │   ├── cJSON.h
+│   ├── settings
+│   │   ├── events.json
+│   │   └── settings.json
 │   ├── html
-│   │   ├── config
-│   │   │   ├── events.json
-│   │   │   └── settings.json
 │   │   ├── index.html
 │   │   ├── css
 │   │   │   └── style.css
@@ -342,7 +342,7 @@ int main(void) {
 
 ### Event Fire
 An ACAP service will typically fire an event when something occurs/detected in the ACAP Service.  
-1. Add file ./app/html/config/events.json that defined the events.  Events may be triggere or stateful (having high and low states)
+1. Add file ./app/settings/events.json that defined the events.  Events may be triggere or stateful (having high and low states)
 2. Initialize the ACAP wrapper
 2. Call the fire events finctions in ACAP.h and ACAP.c
 
