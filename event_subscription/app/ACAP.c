@@ -19,7 +19,8 @@
 #include <sys/stat.h>
 #include <glib-object.h>
 #include <glib.h>
-#include <axsdk/axparameter.h>
+#include <curl/curl.h>
+#include <gio/gio.h>
 #include <axsdk/axevent.h>
 #include <pthread.h>
 #include "ACAP.h"
@@ -41,11 +42,13 @@ void		ACAP_HTTP_Cleanup(void);
 cJSON*		ACAP_EVENTS(void);
 int 		ACAP_FILE_Init(void);
 cJSON* 		ACAP_DEVICE(void);
+void 		ACAP_VAPIX_Init(void);
 
 static void ACAP_ENDPOINT_settings(const ACAP_HTTP_Response response, const ACAP_HTTP_Request request);
 static void ACAP_ENDPOINT_app(const ACAP_HTTP_Response response, const ACAP_HTTP_Request request);
 static char ACAP_package_name[ACAP_MAX_PACKAGE_NAME];
 static ACAP_Config_Update ACAP_UpdateCallback = NULL;
+cJSON* SplitString(const char* input, const char* delimiter);
 
 
 /*-----------------------------------------------------
@@ -110,6 +113,7 @@ cJSON* ACAP(const char* package, ACAP_Config_Update callback) {
     cJSON_AddItemToObject(app, "settings", settings);
 
     // Initialize subsystems
+	ACAP_VAPIX_Init();
     ACAP_EVENTS();
 	ACAP_HTTP();
     
@@ -605,9 +609,10 @@ int ACAP_HTTP_Respond_JSON(ACAP_HTTP_Response response, cJSON* object) {
         return 0;
     }
 
-    char* jsonString = cJSON_Print(object);
+    char* jsonString = cJSON_PrintUnformatted(object);
     if (!jsonString) {
         LOG_WARN("Failed to serialize JSON\n");
+		ACAP_HTTP_Respond_Error(response, 500, "Failed to serialize JSON");
         return 0;
     }
 
@@ -858,34 +863,6 @@ cJSON* ACAP_STATUS_Object(const char* group, const char* name) {
  *------------------------------------------------------------------*/
 
 static cJSON* ACAP_DEVICE_Container = NULL;
-static AXParameter* ACAP_DEVICE_parameter_handler = NULL;
-
-static void
-ACAP_ENDPOINT_device(ACAP_HTTP_Response response, ACAP_HTTP_Request request) {
-    const char* method = ACAP_HTTP_Get_Method(request);
-    
-    // Verify method is GET
-    if (!method || strcmp(method, "GET") != 0) {
-        ACAP_HTTP_Respond_Error(response, 405, "Method Not Allowed - Only GET supported");
-        return;
-    }
-
-    // Check if device container is initialized
-    if (!ACAP_DEVICE_Container) {
-        ACAP_HTTP_Respond_Error(response, 500, "Device properties not initialized");
-        return;
-    }
-
-    // Update dynamic properties
-    cJSON_ReplaceItemInObject(ACAP_DEVICE_Container, "date", 
-                             cJSON_CreateString(ACAP_DEVICE_Date()));
-    cJSON_ReplaceItemInObject(ACAP_DEVICE_Container, "time", 
-                             cJSON_CreateString(ACAP_DEVICE_Time()));
-
-    // Send response
-    ACAP_HTTP_Respond_JSON(response, ACAP_DEVICE_Container);
-}
-
 
 double previousTransmitted = 0;
 double previousNetworkTimestamp = 0;
@@ -1000,62 +977,280 @@ ACAP_DEVICE_JSON( const char *attribute ) {
   return cJSON_GetObjectItem(ACAP_DEVICE_Container,attribute);
 }
 
+/* -------------------------------------------------------------
+LOCATION 
+ -------------------------------------------------------------*/
+char* ExtractValue(const char* xml, const char* tag) {
+    char startTag[64], endTag[64];
+    snprintf(startTag, sizeof(startTag), "<%s>", tag);
+    snprintf(endTag, sizeof(endTag), "</%s>", tag);
+
+    char* start = strstr(xml, startTag);
+    if (!start) return NULL;
+    start += strlen(startTag);
+
+    char* end = strstr(start, endTag);
+    if (!end) return NULL;
+
+    size_t valueLength = end - start;
+    char* value = (char*)malloc(valueLength + 1);
+    if (!value) return NULL;
+
+    strncpy(value, start, valueLength);
+    value[valueLength] = '\0';
+    return value;
+}
+
+cJSON* GetLocationData() {
+    char *xmlResponse = ACAP_VAPIX_Get("geolocation/get.cgi");
+    cJSON* locationData = cJSON_CreateObject();
+
+    if (xmlResponse) {
+        // Extract values from the XML response
+        char* latStr = ExtractValue(xmlResponse, "Lat");
+        char* lonStr = ExtractValue(xmlResponse, "Lng");
+        char* headingStr = ExtractValue(xmlResponse, "Heading");
+        char* text = ExtractValue(xmlResponse, "Text");
+
+        // Parse latitude
+        if (latStr) {
+            double lat = atof(latStr); // Convert to double
+            cJSON_AddNumberToObject(locationData, "lat", lat);
+            free(latStr);
+        } else {
+            cJSON_AddNumberToObject(locationData, "lat", 0.0); // Default value
+        }
+
+        // Parse longitude
+        if (lonStr) {
+            double lon = atof(lonStr); // Convert to double
+            cJSON_AddNumberToObject(locationData, "lon", lon);
+            free(lonStr);
+        } else {
+            cJSON_AddNumberToObject(locationData, "lon", 0.0); // Default value
+        }
+
+        // Parse heading
+        if (headingStr) {
+            int heading = atoi(headingStr); // Convert to integer
+            cJSON_AddNumberToObject(locationData, "heading", heading);
+            free(headingStr);
+        } else {
+            cJSON_AddNumberToObject(locationData, "heading", 0); // Default value
+        }
+
+        // Parse text
+        if (text) {
+            cJSON_AddStringToObject(locationData, "text", text);
+            free(text);
+        } else {
+            cJSON_AddStringToObject(locationData, "text", ""); // Default value
+        }
+
+        // Free the XML response memory if dynamically allocated
+        free(xmlResponse);
+    } else {
+        fprintf(stderr, "%s: No response from API\n", __func__);
+        
+        // Add default values in case of no response
+        cJSON_AddNumberToObject(locationData, "lat", 0.0);
+        cJSON_AddNumberToObject(locationData, "lon", 0.0);
+        cJSON_AddNumberToObject(locationData, "heading", 0);
+        cJSON_AddStringToObject(locationData, "text", "");
+    }
+
+    return locationData;
+}
+
+void AppendQueryParameter(char* query, const char* key, const char* value) {
+    // If the query string is not empty, add an '&' separator
+    if (strlen(query) > 0) {
+        strcat(query, "&");
+    }
+    // Append the key=value pair to the query string
+    strcat(query, key);
+    strcat(query, "=");
+    strcat(query, value);
+}
+
+void FormatCoordinates(double lat, double lon, char* latBuffer, size_t latSize, char* lonBuffer, size_t lonSize) {
+    // Format latitude: DD.DDDD
+    snprintf(latBuffer, latSize, "%.8f", lat);
+
+    // Format longitude: DDD.DDDD (with leading zero if necessary)
+    if (lon >= 0 && lon < 100) {
+        snprintf(lonBuffer, lonSize, "0%.8f", lon); // Add leading zero for positive two-digit longitude
+    } else if (lon > -100 && lon < 0) {
+        snprintf(lonBuffer, lonSize, "-0%.8f", -lon); // Add leading zero for negative two-digit longitude
+    } else {
+        snprintf(lonBuffer, lonSize, "%.8f", lon); // No leading zero needed for three-digit longitude
+    }
+}
+
+int SetLocationData(cJSON* location) {
+    char query[512] = {0}; // Buffer for query string
+    char latBuffer[24], lonBuffer[24]; // Buffers for formatted coordinates
+    char valueBuffer[64];  // Buffer for other parameters
+
+    // Check and append "lat" and "lon" if present
+    cJSON* lat = cJSON_GetObjectItem(location, "lat");
+    cJSON* lon = cJSON_GetObjectItem(location, "lon");
+    if (lat && lon && !cJSON_IsNull(lat) && !cJSON_IsNull(lon)) {
+        // Format latitude and longitude according to the API requirements
+        FormatCoordinates(lat->valuedouble, lon->valuedouble, latBuffer, sizeof(latBuffer), lonBuffer, sizeof(lonBuffer));
+        AppendQueryParameter(query, "lat", latBuffer);
+        AppendQueryParameter(query, "lng", lonBuffer);
+    }
+
+    // Check and append "heading" if present
+    cJSON* heading = cJSON_GetObjectItem(location, "heading");
+    if (heading && !cJSON_IsNull(heading)) {
+        snprintf(valueBuffer, sizeof(valueBuffer), "%d", heading->valueint);
+        AppendQueryParameter(query, "heading", valueBuffer);
+    }
+
+    // Check and append "text" if present
+    cJSON* text = cJSON_GetObjectItem(location, "text");
+    if (text && !cJSON_IsNull(text)) {
+        AppendQueryParameter(query, "text", text->valuestring);
+    }
+
+    // If no parameters were added, return an error
+    if (strlen(query) == 0) {
+        fprintf(stderr, "%s: No valid parameters to set.\n", __func__);
+        return 0; // Indicate failure
+    }
+
+    // Construct full API URL
+    char url[1024];
+    snprintf(url, sizeof(url), "geolocation/set.cgi?%s", query);
+
+    // Perform API call (replace with actual implementation)
+    char *xmlResponse = ACAP_VAPIX_Get(url);
+
+    // Check response for success or failure
+    if (xmlResponse) {
+        if (strstr(xmlResponse, "<GeneralSuccess/>")) {
+            free(xmlResponse); // Free response memory if dynamically allocated
+            return 1;          // Success
+        } else {
+            fprintf(stderr, "%s: Error in response: %s\n", __func__, xmlResponse);
+            free(xmlResponse); // Free response memory if dynamically allocated
+            return 0;          // Failure
+        }
+    }
+
+    fprintf(stderr, "%s: Failed to contact API.\n", __func__);
+    return 0; // Indicate failure due to no response
+}
+
 
 cJSON* ACAP_DEVICE(void) {
-	gchar *value = 0, *pHead,*pTail;
-
 	ACAP_DEVICE_Container = cJSON_CreateObject();
-	ACAP_DEVICE_parameter_handler = ax_parameter_new(ACAP_package_name, 0);
-	if( !ACAP_DEVICE_parameter_handler ) {
-		LOG_WARN("Cannot create parameter ACAP_DEVICE_parameter_handler");
-		return cJSON_CreateNull();
+	cJSON* data = 0;
+	cJSON* apiData = 0;
+	cJSON* items = 0;
+	char *response = 0;
+
+	// Get Device Info
+    const char* basicInfo =
+		"{"
+		  "\"apiVersion\": \"1.0\","
+		  "\"context\": \"ACAP\","
+		  "\"method\": \"getAllProperties\""
+		"}";
+	response = ACAP_VAPIX_Post("basicdeviceinfo.cgi",basicInfo);
+	if( response ) {
+		apiData = cJSON_Parse(response);
+		if( apiData ) {
+			data  = cJSON_GetObjectItem(apiData,"data");
+			if( data )
+				data = cJSON_GetObjectItem(data,"propertyList");
+		}
 	}
+	if( data && cJSON_GetObjectItem(data,"SerialNumber") )
+		cJSON_AddStringToObject(ACAP_DEVICE_Container,"serial",cJSON_GetObjectItem(data,"SerialNumber")->valuestring);
+	else
+		cJSON_AddStringToObject(ACAP_DEVICE_Container,"serial","000000000000");
+	if( data && cJSON_GetObjectItem(data,"ProdNbr") )
+		cJSON_AddStringToObject(ACAP_DEVICE_Container,"model",cJSON_GetObjectItem(data,"ProdNbr")->valuestring);
+	else
+		cJSON_AddStringToObject(ACAP_DEVICE_Container,"model","Unknown");
+	if( data && cJSON_GetObjectItem(data,"Soc") )
+		cJSON_AddStringToObject(ACAP_DEVICE_Container,"platform",cJSON_GetObjectItem(data,"Soc")->valuestring);
+	else
+		cJSON_AddStringToObject(ACAP_DEVICE_Container,"platform","Unknown");
+	if( data && cJSON_GetObjectItem(data,"Architecture") )
+		cJSON_AddStringToObject(ACAP_DEVICE_Container,"chip",cJSON_GetObjectItem(data,"Architecture")->valuestring);
+	else
+		cJSON_AddStringToObject(ACAP_DEVICE_Container,"chip","Unknown");
+	if( data && cJSON_GetObjectItem(data,"Version") )
+		cJSON_AddStringToObject(ACAP_DEVICE_Container,"firmware",cJSON_GetObjectItem(data,"Version")->valuestring);
+	else
+		cJSON_AddStringToObject(ACAP_DEVICE_Container,"firmware","0.0.0");
+	if( apiData )
+		cJSON_Delete(apiData);
+	if( response )
+		free(response);
+/*
+	// Get Network Hostname
+    const char* networkInfo =
+		"{"
+		  "\"apiVersion\": \"1.33\","
+		  "\"context\": \"ACAP\","
+		  "\"method\": \"getNetworkInfo\","
+		  "\"params\":{}"
+		"}";
+	response = ACAP_VAPIX_Post("network_settings.cgi",networkInfo);
+	if( response ) {
+		apiData = cJSON_Parse(response);
+		free(response);
+		if( apiData ) {
+			data  = cJSON_GetObjectItem(apiData,"data");
+			if( data )
+				data = cJSON_GetObjectItem(data,"data");
+			if( data )
+				data = cJSON_GetObjectItem(data,"system");
+			if( data )
+				data = cJSON_GetObjectItem(data,"hostname");
+			if( data )
+				data = cJSON_GetObjectItem(data,"hostname");
+		}
+	}
+	if( data && data->type == cJSON_String && strlen( data->valuestring ) )
+		cJSON_AddStringToObject(ACAP_DEVICE_Container,"hostname",data->valuestring);
+	else
+		cJSON_AddStringToObject(ACAP_DEVICE_Container,"hostname","Unknown");
+	if( apiData )
+		cJSON_Delete(apiData);
+*/
+
+	cJSON_AddItemToObject(ACAP_DEVICE_Container,"location",GetLocationData());
 	
-
-	if(ax_parameter_get(ACAP_DEVICE_parameter_handler, "root.Properties.System.SerialNumber", &value, 0)) {
-		cJSON_AddItemToObject(ACAP_DEVICE_Container,"serial",cJSON_CreateString(value));
-		g_free(value);
-	}
-  
-	if(ax_parameter_get(ACAP_DEVICE_parameter_handler, "root.brand.ProdShortName", &value, 0)) {
-		cJSON_AddItemToObject(ACAP_DEVICE_Container,"model",cJSON_CreateString(value));
-		g_free(value);
-	}
-
-	if(ax_parameter_get(ACAP_DEVICE_parameter_handler, "root.Properties.System.Architecture", &value, 0)) {
-		cJSON_AddItemToObject(ACAP_DEVICE_Container,"platform",cJSON_CreateString(value));
-		g_free(value);
-	}
-
-	if(ax_parameter_get(ACAP_DEVICE_parameter_handler, "root.Properties.System.Soc", &value, 0)) {
-		cJSON_AddItemToObject(ACAP_DEVICE_Container,"chip",cJSON_CreateString(value));
-		g_free(value);
-	}
-
-	if(ax_parameter_get(ACAP_DEVICE_parameter_handler, "root.brand.ProdType", &value, 0)) {
-		cJSON_AddItemToObject(ACAP_DEVICE_Container,"type",cJSON_CreateString(value));
-		g_free(value);
-	}
-
-//	if(ax_parameter_get(ACAP_DEVICE_parameter_handler, "root.Network.VolatileHostName.HostName", &value, 0)) {
-//		cJSON_AddItemToObject(ACAP_DEVICE_Container,"hostname",cJSON_CreateString(value));
-//		g_free(value);
-//	}
-  
-	int aspect = 169;
-
-	if(ax_parameter_get(ACAP_DEVICE_parameter_handler, "root.ImageSource.I0.Sensor.AspectRatio",&value,0 )) {
-		cJSON_AddItemToObject(ACAP_DEVICE_Container,"aspect",cJSON_CreateString(value));
-		if(strcmp(value,"4:3") == 0)
-			aspect = 43;
-		if(strcmp(value,"16:10") == 0)
-			aspect = 1610;
-		if(strcmp(value,"1:1") == 0)
-			aspect = 11;
-		g_free(value);
+	//Get Camera Aspect ratio
+	response = ACAP_VAPIX_Get("param.cgi?action=list&group=root.ImageSource.I0.Sensor.AspectRatio");
+	if( response ) {
+		items = SplitString( response, "=" );
+		if( items && cJSON_GetArraySize(items) == 2 )
+			cJSON_AddStringToObject(ACAP_DEVICE_Container,"aspect",cJSON_GetArrayItem(items,1)->valuestring);
+		else
+			cJSON_AddStringToObject(ACAP_DEVICE_Container,"aspect","16:9");
+		free(response);
 	} else {
 		cJSON_AddStringToObject(ACAP_DEVICE_Container,"aspect","16:9");
 	}
+	if( items )
+		cJSON_Delete(items);
+
+	//Build resolution data
+	char *value = cJSON_GetObjectItem(ACAP_DEVICE_Container,"aspect")->valuestring;
+	int aspect = 169;
+	if(strcmp(value,"4:3") == 0)
+		aspect = 43;
+	if(strcmp(value,"16:10") == 0)
+		aspect = 1610;
+	if(strcmp(value,"1:1") == 0)
+		aspect = 11;
   
 	cJSON* resolutionList = cJSON_CreateArray();
 	cJSON* resolutions = cJSON_CreateObject();
@@ -1068,96 +1263,40 @@ cJSON* ACAP_DEVICE(void) {
 	cJSON_AddItemToObject(resolutions,"1:1",resolutions11);
 	cJSON* resolutions1610 = cJSON_CreateArray();
 	cJSON_AddItemToObject(resolutions,"16:10",resolutions1610);
-	if(ax_parameter_get(ACAP_DEVICE_parameter_handler, "root.Properties.Image.Resolution", &value, 0)) {
-		pHead = value;
-		pTail = value;
-		while( *pHead ) {
-			if( *pHead == ',' ) {
-				*pHead = 0;
-				cJSON_AddItemToArray( resolutionList, cJSON_CreateString(pTail) );
-				pTail = pHead + 1;
-			}
-			pHead++;
-		}
-		cJSON_AddItemToArray( resolutionList, cJSON_CreateString(pTail) );
-		g_free(value);
 
-		int length = cJSON_GetArraySize(resolutionList);
-		int index;
-		char data[30];
-		int width = 0;
-		int height = 0;
-		for( index = 0; index < length; index++ ) {
-			char* resolution = strcpy(data,cJSON_GetArrayItem(resolutionList,index)->valuestring);
-			if( resolution ) {
-				char* sX = resolution;
-				char* sY = 0;
-				while( *sX != 0 ) {
-					if( *sX == 'x' ) {
-						*sX = 0;
-						sY = sX + 1;
+	response = ACAP_VAPIX_Get("param.cgi?action=list&group=root.Properties.Image.Resolution");
+	if( response ) {
+		items = SplitString( response, "=" );
+		if( items && cJSON_GetArraySize(items) == 2 ) {
+			cJSON* apiResolutions = SplitString( cJSON_GetArrayItem(items,1)->valuestring, "," );
+			cJSON_Delete(items);
+			if( apiResolutions && cJSON_GetArraySize(apiResolutions) > 4 ) {
+				cJSON* resolution = apiResolutions->child;
+				while( resolution ) {
+					items = SplitString(resolution->valuestring,"x");
+					if( items && cJSON_GetArraySize(items) == 2 ) {
+						int w = atoi(cJSON_GetArrayItem(items,0)->valuestring);
+						int h = atoi(cJSON_GetArrayItem(items,1)->valuestring);
+						int a = (w*100)/h;
+						if( a == 177 )
+							cJSON_AddItemToArray(resolutions169, cJSON_CreateString(resolution->valuestring));
+						if( a == 133 )
+							cJSON_AddItemToArray(resolutions43, cJSON_CreateString(resolution->valuestring));
+						if( a == 160 )
+							cJSON_AddItemToArray(resolutions1610, cJSON_CreateString(resolution->valuestring));
+						if( a == 100 )
+							cJSON_AddItemToArray(resolutions11, cJSON_CreateString(resolution->valuestring));
 					}
-					sX++;
+					if( items )
+						cJSON_Delete(items);
+					resolution = resolution->next;
 				}
-				if( sY ) {
-					int x = atoi(resolution);
-					int y = atoi(sY);
-					if( x && y ) {
-						int a = (x*100)/y;
-						if( a == 177 ) {
-							cJSON_AddItemToArray(resolutions169, cJSON_CreateString(cJSON_GetArrayItem(resolutionList,index)->valuestring));
-							if(aspect == 169 && x > width )
-								width = x;
-							if(aspect == 169 && y > height )
-								height = y;
-						}
-						if( a == 133 ) {
-							cJSON_AddItemToArray(resolutions43, cJSON_CreateString(cJSON_GetArrayItem(resolutionList,index)->valuestring));
-							if(aspect == 43 && x > width )
-								width = x;
-							if(aspect == 43 && y > height )
-								height = y;
-						}
-						if( a == 160 ) {
-							cJSON_AddItemToArray(resolutions1610, cJSON_CreateString(cJSON_GetArrayItem(resolutionList,index)->valuestring));
-							if(aspect == 1610 && x > width )
-								width = x;
-							if(aspect == 1610 && y > height )
-								height = y;
-						}
-						if( a == 100 ) {
-							cJSON_AddItemToArray(resolutions11, cJSON_CreateString(cJSON_GetArrayItem(resolutionList,index)->valuestring));
-							if(aspect == 11 && x > width )
-								width = x;
-							if(aspect == 11 && y > height )
-								height = y;
-						}
-					}
-				}
+				if( apiResolutions )
+					cJSON_Delete(apiResolutions);
 			}
 		}
-		cJSON_AddItemToObject(ACAP_DEVICE_Container,"width",cJSON_CreateNumber(width));
-		cJSON_AddItemToObject(ACAP_DEVICE_Container,"height",cJSON_CreateNumber(height));
-		
-		int a = (width*100)/height;
-		if( a == 133 )
-			cJSON_ReplaceItemInObject(ACAP_DEVICE_Container,"aspect",cJSON_CreateString("4:3") );
-		if( a == 160 )
-			cJSON_ReplaceItemInObject(ACAP_DEVICE_Container,"aspect",cJSON_CreateString("16:10") );
-		if( a == 100 )
-			cJSON_ReplaceItemInObject(ACAP_DEVICE_Container,"aspect",cJSON_CreateString("1:1") );
-		cJSON_Delete(resolutionList);
+		free(response);
 	}
- 
-	if(ax_parameter_get(ACAP_DEVICE_parameter_handler, "root.Properties.Firmware.Version",&value,0 )) {
-		cJSON_AddItemToObject(ACAP_DEVICE_Container,"firmware",cJSON_CreateString(value));
-		g_free(value);
-	}  
-
- 
-	ax_parameter_free(ACAP_DEVICE_parameter_handler);
-	
-	ACAP_HTTP_Node("device",ACAP_ENDPOINT_device);
 	return ACAP_DEVICE_Container;
 }
 
@@ -1165,6 +1304,41 @@ cJSON* ACAP_DEVICE(void) {
 /*------------------------------------------------------------------
  * Time and System Information
  *------------------------------------------------------------------*/
+
+double
+ACAP_DEVICE_Longitude() {
+	if( !ACAP_DEVICE_Container )
+		return 0;
+	cJSON* location = cJSON_GetObjectItem(ACAP_DEVICE_Container,"location");
+	if(!location)
+		return 0;
+	return cJSON_GetObjectItem(location,"lon")?cJSON_GetObjectItem(location,"lon")->valuedouble:0;
+}
+
+double
+ACAP_DEVICE_Latitude() {
+	if( !ACAP_DEVICE_Container )
+		return 0;
+	cJSON* location = cJSON_GetObjectItem(ACAP_DEVICE_Container,"location");
+	if(!location)
+		return 0;
+	return cJSON_GetObjectItem(location,"lat")?cJSON_GetObjectItem(location,"lat")->valuedouble:0;
+}
+
+int
+ACAP_DEVICE_Set_Location( double lat, double lon) {
+	LOG_TRACE("%s: %f %f\n",__func__,lat,lon);
+	if( !ACAP_DEVICE_Container )
+		return 0;
+	cJSON* location = cJSON_GetObjectItem(ACAP_DEVICE_Container,"location");
+	if(!location ) {
+		LOG_WARN("%s: Missing location data\n",__func__);
+		return 0;
+	}
+	cJSON_ReplaceItemInObject(location,"lat",cJSON_CreateNumber(lat));
+	cJSON_ReplaceItemInObject(location,"lon",cJSON_CreateNumber(lon));
+	return SetLocationData(location);
+}
 
 int
 ACAP_DEVICE_Seconds_Since_Midnight() {
@@ -1606,15 +1780,11 @@ ACAP_EVENTS_Main_Callback(guint subscription, AXEvent *axEvent, gpointer user_da
 	LOG_TRACE("%s:\n",__func__);
 
 	cJSON* eventData = ACAP_EVENTS_Parse(axEvent);
-	if( user_data )
-		cJSON_AddStringToObject(eventData,"name",(char *)user_data);
-	else {
-		cJSON_AddStringToObject(eventData,"name","Undefined");
-	}
 	if( !eventData )
 		return;
+	cJSON_AddItemReferenceToObject(eventData, "source", (cJSON*)user_data);	
 	if( EVENT_USER_CALLBACK )
-		EVENT_USER_CALLBACK( eventData );
+		EVENT_USER_CALLBACK( eventData, (void*)user_data );
 	cJSON_Delete(eventData);
 }
 
@@ -1630,11 +1800,10 @@ event structure
 */
 
 int
-ACAP_EVENTS_Subscribe( cJSON *event ) {
+ACAP_EVENTS_Subscribe( cJSON *event, void* user_data ) {
 	AXEventKeyValueSet *keyset = 0;	
 	cJSON *topic;
 	guint declarationID = 0;
-	int result;
 
 	if(!ACAP_EVENTS_HANDLER) {
 		LOG_WARN("%s: Event handler not initialize\n",__func__);
@@ -1714,12 +1883,13 @@ ACAP_EVENTS_Subscribe( cJSON *event ) {
 		}
 		LOG_TRACE("%s: topic3 %s %s\n",__func__, topic->child->string, topic->child->valuestring );
 	}
+
 	int ax = ax_event_handler_subscribe(
 		ACAP_EVENTS_HANDLER, 
 		keyset, 
 		&declarationID,
 		ACAP_EVENTS_Main_Callback,
-		cJSON_GetObjectItem( event,"name" )->valuestring,
+		(gpointer)user_data,
 		NULL
 	);
 	
@@ -2068,6 +2238,179 @@ ACAP_EVENTS_Add_Event_JSON( cJSON* event ) {
 	return declarationID;
 }
 
+/*-----------------------------------------------------
+ * VAPIX
+ *-----------------------------------------------------*/
+char *VAPIX_Credentials = 0;
+CURL* VAPIX_CURL = 0;
+
+// Callback function to append data to a dynamically allocated buffer
+static size_t append_to_buffer_callback(char* ptr, size_t size, size_t nmemb, void* userdata) {
+    size_t processed_bytes = size * nmemb;
+    char** response_buffer = (char**)userdata;
+
+    // Reallocate buffer to accommodate new data
+    size_t current_length = *response_buffer ? strlen(*response_buffer) : 0;
+    char* new_buffer = realloc(*response_buffer, current_length + processed_bytes + 1);
+    if (!new_buffer) {
+        LOG_WARN("%s: Memory allocation failed", __func__);
+        return 0; // Signal an error to libcurl
+    }
+
+    // Append new data to the buffer
+    memcpy(new_buffer + current_length, ptr, processed_bytes);
+    new_buffer[current_length + processed_bytes] = '\0'; // Null-terminate the string
+
+    *response_buffer = new_buffer;
+    return processed_bytes;
+}
+
+char* ACAP_VAPIX_Get(const char* endpoint) {
+    if (!VAPIX_Credentials || !VAPIX_CURL || !endpoint) {
+        LOG_WARN("%s: Invalid input\n", __func__);
+        return NULL;
+    }
+
+    char* response = NULL; // Initialize response buffer
+    char* url = malloc(strlen("http://127.0.0.12/axis-cgi/") + strlen(endpoint) + 1);
+    if (!url) {
+        LOG_WARN("%s: Memory allocation failed", __func__);
+        return NULL;
+    }
+    sprintf(url, "http://127.0.0.12/axis-cgi/%s", endpoint);
+
+    curl_easy_setopt(VAPIX_CURL, CURLOPT_URL, url);
+    curl_easy_setopt(VAPIX_CURL, CURLOPT_USERPWD, VAPIX_Credentials);
+    curl_easy_setopt(VAPIX_CURL, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+    curl_easy_setopt(VAPIX_CURL, CURLOPT_HTTPGET, 1L); // Explicitly set GET method
+    curl_easy_setopt(VAPIX_CURL, CURLOPT_WRITEFUNCTION, append_to_buffer_callback);
+    curl_easy_setopt(VAPIX_CURL, CURLOPT_WRITEDATA, &response);
+
+    CURLcode res = curl_easy_perform(VAPIX_CURL);
+    free(url);
+
+    if (res != CURLE_OK) {
+        LOG_WARN("%s: %d: %s", __func__, res, curl_easy_strerror(res));
+        free(response);
+        return NULL;
+    }
+
+    long response_code;
+    curl_easy_getinfo(VAPIX_CURL, CURLINFO_RESPONSE_CODE, &response_code);
+    if (response_code >= 300) {
+        LOG_WARN("%s: Code %ld %s\n", __func__, response_code, response ? response : "No response");
+        free(response);
+        return NULL;
+    }
+
+    LOG_TRACE("%s: %s\n", __func__, response ? response : "No response");
+    return response; // Caller must free this buffer
+}
+
+char* ACAP_VAPIX_Post(const char* endpoint, const char* request) {
+    if (!VAPIX_Credentials || !VAPIX_CURL || !endpoint || !request) {
+        LOG_WARN("%s: Invalid input\n", __func__);
+        return NULL;
+    }
+
+	LOG_TRACE("%s: %s %s\n",__func__,endpoint,request);
+
+    char* response = NULL; // Initialize response buffer
+    char* url = malloc(strlen("http://127.0.0.12/axis-cgi/") + strlen(endpoint) + 1);
+    if (!url) {
+        LOG_WARN("%s: Memory allocation failed", __func__);
+        return NULL;
+    }
+    sprintf(url, "http://127.0.0.12/axis-cgi/%s", endpoint);
+
+    curl_easy_setopt(VAPIX_CURL, CURLOPT_URL, url);
+    curl_easy_setopt(VAPIX_CURL, CURLOPT_USERPWD, VAPIX_Credentials);
+    curl_easy_setopt(VAPIX_CURL, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
+    curl_easy_setopt(VAPIX_CURL, CURLOPT_POSTFIELDS, request);
+    curl_easy_setopt(VAPIX_CURL, CURLOPT_WRITEFUNCTION, append_to_buffer_callback);
+    curl_easy_setopt(VAPIX_CURL, CURLOPT_WRITEDATA, &response);
+
+    CURLcode res = curl_easy_perform(VAPIX_CURL);
+    free(url);
+
+    if (res != CURLE_OK) {
+        LOG_WARN("%s: %d: %s", __func__, res, curl_easy_strerror(res));
+        free(response);
+        return NULL;
+    }
+
+    long response_code;
+    curl_easy_getinfo(VAPIX_CURL, CURLINFO_RESPONSE_CODE, &response_code);
+    if (response_code >= 300) {
+        LOG_WARN("%s: Code %ld %s\n", __func__, response_code, response ? response : "No response");
+        free(response);
+        return NULL;
+    }
+
+    LOG_TRACE("%s: %s\n", __func__, response ? response : "No response");
+    return response; // Caller must free this buffer
+}
+
+static char* parse_credentials(GVariant* result) {
+    char* credentials_string = NULL;
+    char* id                 = NULL;
+    char* password           = NULL;
+
+    g_variant_get(result, "(&s)", &credentials_string);
+    if (sscanf(credentials_string, "%m[^:]:%ms", &id, &password) != 2)
+        LOG_WARN("%s: Error parsing credential string %s", __func__, credentials_string);
+    char* credentials = g_strdup_printf("%s:%s", id, password);
+
+    free(id);
+    free(password);
+	LOG_TRACE("%s: %s\n",__func__, credentials);
+    return credentials;
+}
+
+static char* retrieve_vapix_credentials(const char* username) {
+    GError* error               = NULL;
+    GDBusConnection* connection = g_bus_get_sync(G_BUS_TYPE_SYSTEM, NULL, &error);
+    if (!connection) {
+        LOG_TRACE("%s: Error connecting to D-Bus: %s",__func__, error->message);
+		return 0;
+	}
+
+    const char* bus_name       = "com.axis.HTTPConf1";
+    const char* object_path    = "/com/axis/HTTPConf1/VAPIXServiceAccounts1";
+    const char* interface_name = "com.axis.HTTPConf1.VAPIXServiceAccounts1";
+    const char* method_name    = "GetCredentials";
+
+    GVariant* result = g_dbus_connection_call_sync(connection,
+                                                   bus_name,
+                                                   object_path,
+                                                   interface_name,
+                                                   method_name,
+                                                   g_variant_new("(s)", username),
+                                                   NULL,
+                                                   G_DBUS_CALL_FLAGS_NONE,
+                                                   -1,
+                                                   NULL,
+                                                   &error);
+    if (!result) {
+        LOG_WARN("%s: Error invoking D-Bus method: %s",__func__, error->message);
+		g_object_unref(connection);
+		return 0;
+	}
+
+    char* credentials = parse_credentials(result);
+
+    g_variant_unref(result);
+    g_object_unref(connection);
+    return credentials;
+}
+
+void
+ACAP_VAPIX_Init() {
+	LOG_TRACE("%s:\n",__func__);
+	VAPIX_CURL = curl_easy_init();
+	VAPIX_Credentials = retrieve_vapix_credentials("acap");
+}
+
 /*------------------------------------------------------------------
  * Cleanup Implementation
  *------------------------------------------------------------------*/
@@ -2122,6 +2465,50 @@ const char* ACAP_Get_Error_String(ACAP_Status status) {
 /*------------------------------------------------------------------
  * Helper functions
  *------------------------------------------------------------------*/
+
+cJSON* SplitString(const char* input, const char* delimiter) {
+    if (!input || !delimiter) {
+        return NULL; // Invalid input
+    }
+
+    // Create a cJSON array to hold the split strings
+    cJSON* json_array = cJSON_CreateArray();
+    if (!json_array) {
+        return NULL; // Failed to create JSON array
+    }
+
+    // Make a copy of the input string because strtok modifies it
+    char* input_copy = strdup(input);
+    if (!input_copy) {
+        cJSON_Delete(json_array);
+        return NULL; // Memory allocation failure
+    }
+
+    // Remove trailing newline character, if present
+    size_t len = strlen(input_copy);
+    if (len > 0 && input_copy[len - 1] == '\n') {
+        input_copy[len - 1] = '\0';
+    }
+
+    // Use strtok to split the string by the delimiter
+    char* token = strtok(input_copy, delimiter);
+    while (token != NULL) {
+        // Add each token to the JSON array
+        cJSON* json_token = cJSON_CreateString(token);
+        if (!json_token) {
+            free(input_copy);
+            cJSON_Delete(json_array);
+            return NULL; // Memory allocation failure for JSON string
+        }
+        cJSON_AddItemToArray(json_array, json_token);
+
+        // Get the next token
+        token = strtok(NULL, delimiter);
+    }
+
+    free(input_copy); // Free the temporary copy of the input string
+    return json_array;
+}
 
 char**
 string_split( char* a_str,  char a_delim) {

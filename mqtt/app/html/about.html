@@ -6,8 +6,8 @@
     <title></title>
     <link rel="stylesheet" href="css/bootstrap.min.css">
     <link rel="stylesheet" href="css/app.css">
-    <script src="js/jquery.min.js"></script>
-    <script src="js/bootstrap.min.js"></script>
+    <script src="js/jquery-3.7.1.min.js"></script>
+    <script src="js/bootstrap.bundle.min.js"></script>
 </head>
 
 <body>
@@ -22,17 +22,7 @@
 				<a href="about.html" class="list-group-item list-group-item-action active">About</a>
             </div>
         </div>
-        <!-- /#sidebar-wrapper -->
-
-        <!-- Page Content -->
 		<div id="page-content-wrapper" class="p-0">
-			<nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
-				<span class="acap_name"></span>			
-				<button class="btn btn-link" id="menu-toggle">
-					<i class="fas fa-bars"></i>
-				</button>
-			</nav>
-
 			<div class="container">
 				<div class="row">
 					<div class="col-12">
@@ -99,7 +89,7 @@ $(document).ready(function() {
 		cache: false,
 		success: function(app) {
 			document.title = app.manifest.acapPackageConf.setup.friendlyName;
-			$('.acap_name').text(app.manifest.acapPackageConf.setup.friendlyName);			$("#model_status").text("Status: " + app.status.mqtt.status);
+			$('.sidebar-heading').text(app.manifest.acapPackageConf.setup.friendlyName);			$("#model_status").text("Status: " + app.status.mqtt.status);
 			$('#name').text(app.manifest.acapPackageConf.setup.friendlyName);
 			$('#package').text(app.manifest.acapPackageConf.setup.appName);
 			$('#version').text(app.manifest.acapPackageConf.setup.version);

@@ -8,7 +8,7 @@
             "embeddedSdkVersion": "3.0",
             "vendorUrl": "https://pandosme.github.io",
             "runMode": "once",
-            "version": "4.0.0"
+            "version": "4.3.0"
         },
         "configuration": {
 			"httpConfig": [
@@ -16,5 +16,12 @@
 				{"name": "settings","access": "admin","type": "fastCgi"}
 			]
 		}
-    }
+    },
+	"resources": {
+		"dbus": {
+			"requiredMethods": [
+				"com.axis.HTTPConf1.VAPIXServiceAccounts1.GetCredentials"
+			]
+		}
+	}
 }

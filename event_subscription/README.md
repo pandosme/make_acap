@@ -140,6 +140,15 @@ cd demo_event_subscription_sdk4
 ```
 Install the appropriate EAP file (armv7hf or aarch64) in the Axis device.
 
+### 4.3.0	December 20, 2024
+- Additional ACAP bindings
+	* ACAP_DEVICE_Longitude();
+	* ACAP_DEVICE_Latitude();
+	* ACAP_DEVICE_Set_Location( double lat, double lon);
+	* ACAP_VAPIX_Get(const char *request);
+	* ACAP_VAPIX_Post(const char *request, const char* body );
+- Removed all references to axParameter
+
 
 
 

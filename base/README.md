@@ -104,3 +104,11 @@ MIT
 
 > **Note**: This template is designed to accelerate ACAP application development by providing a structured, feature-rich starting point.
 
+### 4.3.0	December 20, 2024
+- Additional ACAP bindings
+	* ACAP_DEVICE_Longitude();
+	* ACAP_DEVICE_Latitude();
+	* ACAP_DEVICE_Set_Location( double lat, double lon);
+	* ACAP_VAPIX_Get(const char *request);
+	* ACAP_VAPIX_Post(const char *request, const char* body );
+- Removed all references to axParameter

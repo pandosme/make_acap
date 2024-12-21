@@ -162,7 +162,6 @@ int main(void) {
 	} else {
 		LOG_WARN("Signal detection failed");
 	}
-	
     g_main_loop_run(main_loop);
 	LOG("Terminating and cleaning up %s\n",APP_PACKAGE);
     ACAP_Cleanup();

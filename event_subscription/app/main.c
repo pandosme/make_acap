@@ -17,7 +17,7 @@
 //#define LOG_TRACE(fmt, args...)    {}
 
 void
-My_Event_Callback(cJSON *event) {
+My_Event_Callback(cJSON *event, void* userdata) {
 	char* json = cJSON_PrintUnformatted(event);
 	LOG("%s: %s\n", __func__,json);
 	free(json);
@@ -49,7 +49,7 @@ int main(void) {
 	eventSubscriptions = ACAP_FILE_Read( "settings/subscriptions.json" );
 	cJSON* subscription = eventSubscriptions?eventSubscriptions->child:0;
 	while(subscription){
-		ACAP_EVENTS_Subscribe(subscription);
+		ACAP_EVENTS_Subscribe( subscription, NULL );
 		subscription = subscription->next;
 	}
 

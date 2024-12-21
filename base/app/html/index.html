@@ -6,8 +6,8 @@
     <title></title>
     <link rel="stylesheet" href="css/bootstrap.min.css">
     <link rel="stylesheet" href="css/app.css">
-    <script src="js/jquery.min.js"></script>
-    <script src="js/bootstrap.min.js"></script>
+    <script src="js/jquery-3.7.1.min.js"></script>
+    <script src="js/bootstrap.bundle.min.js"></script>
     <script src="js/media-stream-player.min.js"></script>
 </head>
 <body>
@@ -23,12 +23,6 @@
 	</div>
 	
 	<div id="page-content-wrapper" class="p-0">
-		<nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
-			<span class="acap_name"></span>			
-			<button class="btn btn-link" id="menu-toggle">
-				<i class="fas fa-bars"></i>
-			</button>
-		</nav>
 
 		<div class="container-fluid">
 			<div class="col-12">
@@ -60,7 +54,7 @@ $(document).ready(function() {
 		cache: false,
 		success: function(app) {
 			document.title = app.manifest.acapPackageConf.setup.friendlyName;
-			$('.acap_name').text(app.manifest.acapPackageConf.setup.friendlyName);
+			$('.sidebar-heading').text(app.manifest.acapPackageConf.setup.friendlyName);
 			const aspectRatio = app.device.aspect || '16:9';
 			const [aspectWidth, aspectHeight] = aspectRatio.split(':').map(Number);
 			const paddingPercentage = (aspectHeight / aspectWidth) * 100;

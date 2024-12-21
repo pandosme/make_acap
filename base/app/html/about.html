@@ -23,14 +23,7 @@
             </div>
         </div>
 
-        <div id="page-content-wrapper">
-            <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
-                <button class="btn btn-link" id="menu-toggle">
-                    <i class="fas fa-bars"></i>
-                </button>
-                <span class="navbar-text" id="model_status"></span>
-            </nav>
-
+        <div id="page-content">
 			<div class="container">
 				<div class="row">
 					<div class="col-12">
@@ -97,7 +90,7 @@ $(document).ready(function() {
 		cache: false,
 		success: function(app) {
 			document.title = app.manifest.acapPackageConf.setup.friendlyName;
-			$('.acap_name').text(app.manifest.acapPackageConf.setup.friendlyName);
+			$('.sidebar-heading').text(app.manifest.acapPackageConf.setup.friendlyName);
 			$('#name').text(app.manifest.acapPackageConf.setup.friendlyName);
 			$('#package').text(app.manifest.acapPackageConf.setup.appName);
 			$('#version').text(app.manifest.acapPackageConf.setup.version);

@@ -23,12 +23,6 @@
 	</div>
 
 	<div id="page-content-wrapper" class="p-0">
-		<nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom">
-			<span class="acap_name"></span>			
-			<button class="btn btn-link" id="menu-toggle">
-				<i class="fas fa-bars"></i>
-			</button>
-		</nav>
 
 		<div class="container-fluid">
 			<div class="col-12 col-md-6 col-lg-3">
@@ -63,7 +57,7 @@ $(document).ready(function() {
 		cache: false,
 		success: function(data) {
 			document.title = data.manifest.acapPackageConf.setup.friendlyName;
-			$('.acap_name').text(data.manifest.acapPackageConf.setup.friendlyName);
+			$('.sidebar-heading').text(data.manifest.acapPackageConf.setup.friendlyName);
 
 		},
 		error: function(response) {

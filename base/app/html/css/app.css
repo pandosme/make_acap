@@ -157,3 +157,21 @@ h2 {
     color: #333;
     margin-bottom: 1.5rem;
 }
+
+.bootstrap-select .dropdown-toggle {
+    height: calc(1.5em + 1rem + 2px);
+    padding: 0.5rem 1rem;
+    font-size: 1.25rem;
+    line-height: 1.5;
+    border-radius: 0.3rem;
+}
+
+.bootstrap-select .dropdown-toggle.btn-light {
+    background-color: #fff;
+    border: 1px solid #ced4da;
+}
+
+.bootstrap-select .dropdown-menu {
+    width: 100%;
+    padding: 0.5rem 0;
+}
