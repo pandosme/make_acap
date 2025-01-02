@@ -2,7 +2,7 @@
 
 Working with the ACAP SDK API is not trivial. Also, the SDK API may change over time. A solution to both challenges is to use an ACAP SDK Wrapper that provides an abstraction layer API. One such Layer is ACAP.h and ACAP.c. Including the files in the project allows faster development as you can focus on the use case. If future ACAP SDK versions introduce breaking changes, you only need to adjust the ACAP.c to support future versions.  
 
-If you find this ACAP valuable, please consider [buying me a coffee](https://buymeacoffee.com/fredjuhlinl).  
+If you find this package valuable, please consider [buying me a coffee](https://buymeacoffee.com/fredjuhlinl).  
 
 # Template Starting Point
 
