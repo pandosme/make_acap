@@ -104,6 +104,9 @@ MIT
 
 > **Note**: This template is designed to accelerate ACAP application development by providing a structured, feature-rich starting point.
 
+### 4.3.1	February 22, 2025
+- Bumbed ACAP.c to version 3.6
+
 ### 4.3.0	December 20, 2024
 - Additional ACAP bindings
 	* ACAP_DEVICE_Longitude();

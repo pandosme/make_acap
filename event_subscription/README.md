@@ -140,6 +140,9 @@ cd demo_event_subscription_sdk4
 ```
 Install the appropriate EAP file (armv7hf or aarch64) in the Axis device.
 
+### 4.3.1 	February 22, 2025
+- Bumped ACAP.c to version 3.6
+
 ### 4.3.0	December 20, 2024
 - Additional ACAP bindings
 	* ACAP_DEVICE_Longitude();

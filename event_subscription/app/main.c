@@ -5,7 +5,6 @@
 #include <glib.h>
 #include <glib-unix.h>
 #include <signal.h>
-#include <axsdk/axevent.h>
 #include "ACAP.h"
 #include "cJSON.h"
 

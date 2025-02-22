@@ -1,6 +1,7 @@
 /*
- * Copyright (c) 2024 Fred Juhlin
+ * Copyright (c) 2025 Fred Juhlin
  * MIT License - See LICENSE file for details
+ * Version 3.6
  */
 
 #include <stdio.h>
@@ -102,8 +103,17 @@ cJSON* ACAP(const char* package, ACAP_Config_Update callback) {
         cJSON* prop = savedSettings->child;
         while (prop) {
             if (cJSON_GetObjectItem(settings, prop->string)) {
-                cJSON_ReplaceItemInObject(settings, prop->string, 
-                                        cJSON_Duplicate(prop, 1));
+  				if( prop->type == cJSON_Object ) {
+					cJSON* settingsProp = cJSON_GetObjectItem(settings,prop->string);
+					cJSON* subprop = prop->child;
+					while( subprop ) {
+						if( cJSON_GetObjectItem( settingsProp, subprop->string ) )
+							cJSON_ReplaceItemInObject(settingsProp, subprop->string, cJSON_Duplicate(subprop, 1));
+						subprop = subprop->next;
+					}
+				} else {
+					cJSON_ReplaceItemInObject(settings, prop->string, cJSON_Duplicate(prop, 1));
+				}
             }
             prop = prop->next;
         }
@@ -127,7 +137,11 @@ cJSON* ACAP(const char* package, ACAP_Config_Update callback) {
 
     // Notify about settings
     if (ACAP_UpdateCallback) {
-        ACAP_UpdateCallback("settings", settings);
+  		cJSON* setting = settings->child;
+		while( setting ) {
+			ACAP_UpdateCallback(setting->string, setting);
+			setting = setting->next;
+		}
     }
 
     LOG_TRACE("%s: Initialization complete\n", __func__);
@@ -664,8 +678,10 @@ int ACAP_HTTP_Respond_Text(ACAP_HTTP_Response response, const char* message) {
  * Status Management Implementation
  *------------------------------------------------------------------*/
 
-static void
-ACAP_ENDPOINT_status(const ACAP_HTTP_Response response, const ACAP_HTTP_Request request) {
+pthread_mutex_t status_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+static void ACAP_ENDPOINT_status(const ACAP_HTTP_Response response, const ACAP_HTTP_Request request) {
+																						  
     const char* method = ACAP_HTTP_Get_Method(request);
     
     if (!method || strcmp(method, "GET") != 0) {
@@ -673,10 +689,14 @@ ACAP_ENDPOINT_status(const ACAP_HTTP_Response response, const ACAP_HTTP_Request 
         return;
     }
 
-	if(!status_container)
-		status_container = cJSON_CreateObject();
-    
+    pthread_mutex_lock(&status_mutex);
+
+    if (!status_container)
+        status_container = cJSON_CreateObject();
+
     ACAP_HTTP_Respond_JSON(response, status_container);
+
+    pthread_mutex_unlock(&status_mutex);
 }
 
 cJSON* ACAP_STATUS(void) {
@@ -717,12 +737,16 @@ void ACAP_STATUS_SetBool(const char* group, const char* name, int state) {
         return;
     }
 
+    pthread_mutex_lock(&status_mutex);
+
     cJSON* item = cJSON_GetObjectItem(groupObj, name);
     if (item) {
         cJSON_ReplaceItemInObject(groupObj, name, cJSON_CreateBool(state));
     } else {
         cJSON_AddItemToObject(groupObj, name, cJSON_CreateBool(state));
     }
+    pthread_mutex_unlock(&status_mutex);
+
 }
 
 void ACAP_STATUS_SetNumber(const char* group, const char* name, double value) {
@@ -736,12 +760,15 @@ void ACAP_STATUS_SetNumber(const char* group, const char* name, double value) {
         return;
     }
 
+    pthread_mutex_lock(&status_mutex);
+
     cJSON* item = cJSON_GetObjectItem(groupObj, name);
     if (item) {
         cJSON_ReplaceItemInObject(groupObj, name, cJSON_CreateNumber(value));
     } else {
         cJSON_AddItemToObject(groupObj, name, cJSON_CreateNumber(value));
     }
+    pthread_mutex_unlock(&status_mutex);
 }
 
 void ACAP_STATUS_SetString(const char* group, const char* name, const char* string) {
@@ -755,12 +782,15 @@ void ACAP_STATUS_SetString(const char* group, const char* name, const char* stri
         return;
     }
 
+    pthread_mutex_lock(&status_mutex);
+
     cJSON* item = cJSON_GetObjectItem(groupObj, name);
     if (item) {
         cJSON_ReplaceItemInObject(groupObj, name, cJSON_CreateString(string));
     } else {
         cJSON_AddItemToObject(groupObj, name, cJSON_CreateString(string));
     }
+    pthread_mutex_unlock(&status_mutex);
 }
 
 void ACAP_STATUS_SetObject(const char* group, const char* name, cJSON* data) {
@@ -774,12 +804,16 @@ void ACAP_STATUS_SetObject(const char* group, const char* name, cJSON* data) {
         return;
     }
 
+    pthread_mutex_lock(&status_mutex);
+
     cJSON* item = cJSON_GetObjectItem(groupObj, name);
     if (item) {
         cJSON_ReplaceItemInObject(groupObj, name, cJSON_Duplicate(data, 1));
     } else {
         cJSON_AddItemToObject(groupObj, name, cJSON_Duplicate(data, 1));
     }
+
+    pthread_mutex_unlock(&status_mutex);
 }
 
 void ACAP_STATUS_SetNull(const char* group, const char* name) {
@@ -792,6 +826,7 @@ void ACAP_STATUS_SetNull(const char* group, const char* name) {
     if (!groupObj) {
         return;
     }
+    pthread_mutex_lock(&status_mutex);
 
     cJSON* item = cJSON_GetObjectItem(groupObj, name);
     if (item) {
@@ -799,6 +834,7 @@ void ACAP_STATUS_SetNull(const char* group, const char* name) {
     } else {
         cJSON_AddItemToObject(groupObj, name, cJSON_CreateNull());
     }
+    pthread_mutex_unlock(&status_mutex);
 }
 
 /*------------------------------------------------------------------
@@ -1192,38 +1228,6 @@ cJSON* ACAP_DEVICE(void) {
 		cJSON_Delete(apiData);
 	if( response )
 		free(response);
-/*
-	// Get Network Hostname
-    const char* networkInfo =
-		"{"
-		  "\"apiVersion\": \"1.33\","
-		  "\"context\": \"ACAP\","
-		  "\"method\": \"getNetworkInfo\","
-		  "\"params\":{}"
-		"}";
-	response = ACAP_VAPIX_Post("network_settings.cgi",networkInfo);
-	if( response ) {
-		apiData = cJSON_Parse(response);
-		free(response);
-		if( apiData ) {
-			data  = cJSON_GetObjectItem(apiData,"data");
-			if( data )
-				data = cJSON_GetObjectItem(data,"data");
-			if( data )
-				data = cJSON_GetObjectItem(data,"system");
-			if( data )
-				data = cJSON_GetObjectItem(data,"hostname");
-			if( data )
-				data = cJSON_GetObjectItem(data,"hostname");
-		}
-	}
-	if( data && data->type == cJSON_String && strlen( data->valuestring ) )
-		cJSON_AddStringToObject(ACAP_DEVICE_Container,"hostname",data->valuestring);
-	else
-		cJSON_AddStringToObject(ACAP_DEVICE_Container,"hostname","Unknown");
-	if( apiData )
-		cJSON_Delete(apiData);
-*/
 
 	cJSON_AddItemToObject(ACAP_DEVICE_Container,"location",GetLocationData());
 	
@@ -1241,18 +1245,8 @@ cJSON* ACAP_DEVICE(void) {
 	}
 	if( items )
 		cJSON_Delete(items);
-
-	//Build resolution data
-	char *value = cJSON_GetObjectItem(ACAP_DEVICE_Container,"aspect")->valuestring;
-	int aspect = 169;
-	if(strcmp(value,"4:3") == 0)
-		aspect = 43;
-	if(strcmp(value,"16:10") == 0)
-		aspect = 1610;
-	if(strcmp(value,"1:1") == 0)
-		aspect = 11;
-  
-	cJSON* resolutionList = cJSON_CreateArray();
+ 
+	//Get Camera Resolutions
 	cJSON* resolutions = cJSON_CreateObject();
 	cJSON_AddItemToObject(ACAP_DEVICE_Container,"resolutions",resolutions);
 	cJSON* resolutions169 = cJSON_CreateArray();
@@ -1436,7 +1430,7 @@ FILE* ACAP_FILE_Open(const char* filepath, const char* mode) {
     
     FILE* file = fopen(fullpath, mode);
     if (!file) {
-        LOG_WARN("%s: Opening file %s failed: %s\n", __func__, fullpath, strerror(errno));
+        LOG_TRACE("%s: Opening file %s failed: %s\n", __func__, fullpath, strerror(errno));
     }
     return file;
 }
@@ -1465,7 +1459,7 @@ cJSON* ACAP_FILE_Read(const char* filepath) {
 
     FILE* file = ACAP_FILE_Open(filepath, "r");
     if (!file) {
-		LOG_WARN("%s: File open error %s\n",__func__,filepath);
+		LOG_TRACE("%s: File open error %s\n",__func__,filepath);
         return NULL;
     }
 
@@ -1780,12 +1774,16 @@ ACAP_EVENTS_Main_Callback(guint subscription, AXEvent *axEvent, gpointer user_da
 	LOG_TRACE("%s:\n",__func__);
 
 	cJSON* eventData = ACAP_EVENTS_Parse(axEvent);
-	if( !eventData )
+	if( !eventData ) {
+		ax_event_free(axEvent);	
 		return;
+	}
+
 	cJSON_AddItemReferenceToObject(eventData, "source", (cJSON*)user_data);	
 	if( EVENT_USER_CALLBACK )
 		EVENT_USER_CALLBACK( eventData, (void*)user_data );
 	cJSON_Delete(eventData);
+	ax_event_free(axEvent);	
 }
 
 /*

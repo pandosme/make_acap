@@ -1,7 +1,8 @@
-/*------------------------------------------------------------------
- *  Fred Juhlin 2024
- *------------------------------------------------------------------*/
-
+/*
+ * Copyright (c) 2024 Fred Juhlin
+ * MIT License - See LICENSE file for details
+ */
+ 
 #ifndef _MQTT_Service_H_
 #define _MQTT_Service_H_
 

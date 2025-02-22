@@ -2,3 +2,6 @@
 *.old
 *.txt
 
+base/install.py
+event_subscription/install.py
+mqtt/install.py
