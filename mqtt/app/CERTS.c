@@ -1,314 +1,288 @@
-#include <string.h>
-#include <stdlib.h>
+/*------------------------------------------------------------------
+ *  Copyright Fred Juhlin (2025)
+ *------------------------------------------------------------------*/
+ 
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <syslog.h>
-#include "CERTS.h"
 #include "ACAP.h"
 
-#define LOG(fmt, args...)    { syslog(LOG_INFO, fmt, ## args);  printf(fmt, ## args); }
-#define LOG_WARN(fmt, args...)    { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args);}
-#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
+#define LOG(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
+#define LOG_WARN(fmt, args...)    { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args); }
+//#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
+#define LOG_TRACE(fmt, args...)    {}
 
-static cJSON* CERTS_SETTINGS = NULL;
-static const char CERTS_CA_STORE[] = "/etc/ssl/certs/ca-certificates.crt";
+cJSON *CERTS_SETTINGS = 0;
+char CERTS_CA_STORE[] = "/etc/ssl/certs/ca-certificates.crt";
+char CERTS_LOCAL_PATH[256];
 
-// Implementation of certificate validation functions
-CERTS_Status CERTS_Validate_CA(const char* pem) {
-    if (!pem) return CERTS_ERROR_INVALID_PARAM;
-    return strstr(pem, "-----BEGIN CERTIFICATE-----") != NULL ? 
-           CERTS_SUCCESS : CERTS_ERROR_INVALID_PEM;
+char*
+CERTS_Get_CA() {
+	if( !CERTS_SETTINGS ) {
+		LOG_WARN("CERTS: Not initialized");
+		return CERTS_CA_STORE;
+	}
+	cJSON* path = cJSON_GetObjectItem(CERTS_SETTINGS,"cafile");
+	if( !path ) {
+		LOG_TRACE("%s: No CA File\n", __func__ );
+		return CERTS_CA_STORE;
+	}
+	LOG_TRACE("%s: %s\n", __func__, path->valuestring);
+	return path->valuestring;
 }
 
-CERTS_Status CERTS_Validate_Cert(const char* pem) {
-    if (!pem) return CERTS_ERROR_INVALID_PARAM;
-    return strstr(pem, "-----BEGIN CERTIFICATE-----") != NULL ? 
-           CERTS_SUCCESS : CERTS_ERROR_INVALID_PEM;
+char*
+CERTS_Get_Cert() {
+	if( !CERTS_SETTINGS ) {
+		LOG_WARN("%s: CERTS is not initiailiaized\n",__func__);
+		return 0;
+	}
+	cJSON* cert = cJSON_GetObjectItem(CERTS_SETTINGS,"certfile");
+	cJSON* key = cJSON_GetObjectItem(CERTS_SETTINGS,"keyfile");
+	if( !cert || !key ) {
+		LOG_TRACE("%s: CERTS_CertFile: 0\n", __func__);
+		return 0;
+	}
+	LOG_TRACE("%s: %s\n", __func__, cert->valuestring);
+	return cert->valuestring;
 }
 
-CERTS_Status CERTS_Validate_Key(const char* pem) {
-    if (!pem) return CERTS_ERROR_INVALID_PARAM;
-    return strstr(pem, "-----BEGIN RSA PRIVATE KEY-----") != NULL ? 
-           CERTS_SUCCESS : CERTS_ERROR_INVALID_PEM;
+char*
+CERTS_Get_Key() {
+	if( !CERTS_SETTINGS ) {
+		LOG_WARN("%s: CERTS is not initiailiaized\n",__func__);
+		return 0;
+	}
+	cJSON* cert = cJSON_GetObjectItem(CERTS_SETTINGS,"certfile");
+	cJSON* key = cJSON_GetObjectItem(CERTS_SETTINGS,"keyfile");
+	if( !cert || !key ) {
+		LOG_TRACE("%s: 0\n",__func__);
+		return 0;
+	}
+	LOG_TRACE("%s: %s\n",__func__, key->valuestring);
+	return key->valuestring;
 }
 
-const char* CERTS_Get_CA(void) {
-    if (!CERTS_SETTINGS) return CERTS_CA_STORE;
-    cJSON* cafile = cJSON_GetObjectItem(CERTS_SETTINGS, "cafile");
-    return cafile ? cafile->valuestring : CERTS_CA_STORE;
+char*
+CERTS_Get_Password() {
+	if( !CERTS_SETTINGS ) {
+		LOG_WARN("%s: CERTS is not initiailiaized\n", __func__);
+		return 0;
+	}
+	cJSON* password = cJSON_GetObjectItem(CERTS_SETTINGS,"password");
+	if( !password ) {
+		LOG_TRACE("%s: 0\n", __func__);
+		return 0;
+	}
+	LOG_TRACE("%s: %s\n",__func__, password->valuestring);
+	return password->valuestring;
 }
 
-const char* CERTS_Get_Cert(void) {
-    if (!CERTS_SETTINGS) return NULL;
-    cJSON* certfile = cJSON_GetObjectItem(CERTS_SETTINGS, "certfile");
-    cJSON* keyfile = cJSON_GetObjectItem(CERTS_SETTINGS, "keyfile");
-    return (certfile && keyfile) ? certfile->valuestring : NULL;
-}
+void
+CERTS_HTTP (const  ACAP_HTTP_Response response,const  ACAP_HTTP_Request request) {
+	LOG_TRACE("%s: Entry\n",__func__);
 
-const char* CERTS_Get_Key(void) {
-    if (!CERTS_SETTINGS) return NULL;
-    cJSON* certfile = cJSON_GetObjectItem(CERTS_SETTINGS, "certfile");
-    cJSON* keyfile = cJSON_GetObjectItem(CERTS_SETTINGS, "keyfile");
-    return (certfile && keyfile) ? keyfile->valuestring : NULL;
-}
+	if( !CERTS_SETTINGS ) {
+		LOG_WARN("CERTS is not initiailiaized\n");
+		 ACAP_HTTP_Respond_Error( response, 400, "Certificate service is not initializied" );
+		return ;
+	}
 
-const char* CERTS_Get_Password(void) {
-    if (!CERTS_SETTINGS) return NULL;
-    cJSON* password = cJSON_GetObjectItem(CERTS_SETTINGS, "password");
-    return password ? password->valuestring : NULL;
-}
-
-static int save_certificate(const char* type, const char* pem) {
-    char filepath[CERTS_MAX_PATH_LENGTH];
-    snprintf(filepath, sizeof(filepath), "localdata/%s.pem", type);
-    
-    FILE* file = ACAP_FILE_Open(filepath, "w");
-    if (!file) {
-        LOG_WARN("CERTS: Cannot open %s for writing\n", filepath);
-        return 0;
-    }
-
-    size_t pemSize = strlen(pem);
-    size_t written = fwrite((void*)pem, 1, pemSize, file);
-    fclose(file);
-
-    if (written != pemSize) {
-        LOG_WARN("CERTS: Could not save cert data\n");
-        return 0;
-    }
-
-    return 1;
-}
-
-void CERTS_HTTP_Callback(const ACAP_HTTP_Response response, const ACAP_HTTP_Request request) {
-    if (!CERTS_SETTINGS) {
-        LOG_WARN("CERTS is not initialized\n");
-        ACAP_HTTP_Respond_Error(response, 400, "Certificate service is not initialized");
-        return;
-    }
-
-    const char* method = request->method;
-    if (!method) {
-        ACAP_HTTP_Respond_Error(response, 400, "Invalid request method");
-        return;
-    }
-
-    // Handle GET request
-    if (strcmp(method, "GET") == 0) {
-        LOG_TRACE("CERTS_HTTP: Respond with data\n");
-        cJSON* copy = cJSON_Duplicate(CERTS_SETTINGS, 1);
-        if (cJSON_GetObjectItem(copy, "password")) {
-            cJSON_ReplaceItemInObject(copy, "password", cJSON_CreateString(""));
-        }
-        ACAP_HTTP_Respond_JSON(response, copy);
-        cJSON_Delete(copy);
-        return;
-    }
-
-    // Handle DELETE request
-    if (strcmp(method, "DELETE") == 0) {
-        const char* type = ACAP_HTTP_Request_Param(request, "type");
-        if (!type) {
-            ACAP_HTTP_Respond_Error(response, 400, "Missing type parameter");
-            return;
-        }
-
-        if (strcmp(type, "ca") == 0) {
-            if (!cJSON_GetObjectItem(CERTS_SETTINGS, "cafile")) {
-                ACAP_HTTP_Respond_Text(response, "OK");
-                return;
-            }
-            if (ACAP_FILE_Delete("localdata/ca.pem")) {
-                cJSON_DeleteItemFromObject(CERTS_SETTINGS, "cafile");
-                ACAP_STATUS_SetBool("certificate", "ca", 0);
-                ACAP_HTTP_Respond_Text(response, "OK");
-            } else {
-                LOG_WARN("Unable to remove CA file\n");
-                ACAP_HTTP_Respond_Error(response, 500, "Failed to remove");
-            }
-            return;
-        }
-
-        if (strcmp(type, "cert") == 0) {
-            if (!cJSON_GetObjectItem(CERTS_SETTINGS, "certfile")) {
-                ACAP_HTTP_Respond_Text(response, "OK");
-                return;
-            }
-            if (ACAP_FILE_Delete("localdata/cert.pem")) {
-                cJSON_DeleteItemFromObject(CERTS_SETTINGS, "certfile");
-                if (ACAP_FILE_Delete("localdata/key.pem")) {
-                    cJSON_DeleteItemFromObject(CERTS_SETTINGS, "keyfile");
-                    if (cJSON_GetObjectItem(CERTS_SETTINGS, "password")) {
-                        ACAP_FILE_Delete("localdata/ph.txt");
-                        cJSON_DeleteItemFromObject(CERTS_SETTINGS, "password");
-                    }
-                }
-                ACAP_STATUS_SetBool("certificate", "cert", 0);
-                ACAP_HTTP_Respond_Text(response, "OK");
-            } else {
-                LOG_WARN("Unable to remove certificate file\n");
-                ACAP_HTTP_Respond_Error(response, 500, "Failed to remove");
-            }
-            return;
-        }
-
-        if (strcmp(type, "key") == 0) {
-            if (!cJSON_GetObjectItem(CERTS_SETTINGS, "keyfile")) {
-                ACAP_HTTP_Respond_Text(response, "OK");
-                return;
-            }
-            if (ACAP_FILE_Delete("localdata/key.pem")) {
-                ACAP_FILE_Delete("localdata/ph.txt");
-                cJSON_DeleteItemFromObject(CERTS_SETTINGS, "keyfile");
-                if (cJSON_GetObjectItem(CERTS_SETTINGS, "password")) {
-                    cJSON_DeleteItemFromObject(CERTS_SETTINGS, "password");
-                    ACAP_STATUS_SetBool("certificate", "password", 0);
-                }
-                ACAP_STATUS_SetBool("certificate", "key", 0);
-                ACAP_HTTP_Respond_Text(response, "OK");
-            } else {
-                LOG_WARN("Unable to remove key file\n");
-                ACAP_HTTP_Respond_Error(response, 500, "Failed to remove");
-            }
-            return;
-        }
-
-        ACAP_HTTP_Respond_Error(response, 400, "Invalid certificate type");
-        return;
-    }
-
-    // Handle POST request
-    if (strcmp(method, "POST") != 0) {
-        ACAP_HTTP_Respond_Error(response, 405, "Method Not Allowed - Use GET, POST, or DELETE");
-        return;
-    }
-
-    // Parse POST data as JSON
-    if (!request->postData || request->postDataLength == 0) {
-        ACAP_HTTP_Respond_Error(response, 400, "Missing POST data");
-        return;
-    }
-
-    cJSON* postJson = cJSON_Parse(request->postData);
-    if (!postJson) {
-        ACAP_HTTP_Respond_Error(response, 400, "Invalid JSON data");
-        return;
-    }
-
-    // Get required fields
-    cJSON* typeJson = cJSON_GetObjectItem(postJson, "type");
-    cJSON* pemJson = cJSON_GetObjectItem(postJson, "pem");
-    
-    if (!typeJson || !pemJson || !typeJson->valuestring || !pemJson->valuestring) {
-        ACAP_HTTP_Respond_Error(response, 400, "Missing required fields (type, pem)");
-        cJSON_Delete(postJson);
-        return;
-    }
-
-    const char* type = typeJson->valuestring;
-    const char* pem = pemJson->valuestring;
-
-    // Validate certificate type
-    if (!(strcmp(type, "ca") == 0 || strcmp(type, "cert") == 0 || strcmp(type, "key") == 0)) {
-        ACAP_HTTP_Respond_Error(response, 400, "Invalid certificate type");
-        cJSON_Delete(postJson);
-        return;
-    }
-
-    // Validate PEM data
-    if ((strcmp(type, "ca") == 0 || strcmp(type, "cert") == 0) && 
-        !strstr(pem, "-----BEGIN CERTIFICATE-----")) {
-        ACAP_HTTP_Respond_Error(response, 400, "Invalid certificate data");
-        cJSON_Delete(postJson);
-        return;
-    }
-
-    if (strcmp(type, "key") == 0 && !strstr(pem, "-----BEGIN RSA PRIVATE KEY-----")) {
-        ACAP_HTTP_Respond_Error(response, 400, "Invalid key data");
-        cJSON_Delete(postJson);
-        return;
-    }
-
-    // Save certificate
-    if (!save_certificate(type, pem)) {
-        ACAP_HTTP_Respond_Error(response, 500, "Failed to save certificate");
-        cJSON_Delete(postJson);
-        return;
-    }
-
-    // Update settings
-    char fullpath[CERTS_MAX_PATH_LENGTH];
-    snprintf(fullpath, sizeof(fullpath), "%s%s", ACAP_FILE_AppPath(), 
-             type == "ca" ? "localdata/ca.pem" :
-             type == "cert" ? "localdata/cert.pem" : "localdata/key.pem");
-
-    if (strcmp(type, "ca") == 0) {
-        if (cJSON_GetObjectItem(CERTS_SETTINGS, "cafile")) {
-            cJSON_ReplaceItemInObject(CERTS_SETTINGS, "cafile", cJSON_CreateString(fullpath));
-        } else {
-            cJSON_AddStringToObject(CERTS_SETTINGS, "cafile", fullpath);
-        }
-        ACAP_STATUS_SetBool("certificate", "ca", 1);
-    } else if (strcmp(type, "cert") == 0) {
-        if (cJSON_GetObjectItem(CERTS_SETTINGS, "certfile")) {
-            cJSON_ReplaceItemInObject(CERTS_SETTINGS, "certfile", cJSON_CreateString(fullpath));
-        } else {
-            cJSON_AddStringToObject(CERTS_SETTINGS, "certfile", fullpath);
-        }
-        ACAP_STATUS_SetBool("certificate", "cert", 1);
-    } else if (strcmp(type, "key") == 0) {
-        if (cJSON_GetObjectItem(CERTS_SETTINGS, "keyfile")) {
-            cJSON_ReplaceItemInObject(CERTS_SETTINGS, "keyfile", cJSON_CreateString(fullpath));
-        } else {
-            cJSON_AddStringToObject(CERTS_SETTINGS, "keyfile", fullpath);
-        }
-        
-        // Handle password
-        if (cJSON_GetObjectItem(CERTS_SETTINGS, "password")) {
-            cJSON_DeleteItemFromObject(CERTS_SETTINGS, "password");
-        }
-        
-        cJSON* passwordJson = cJSON_GetObjectItem(postJson, "password");
-        if (passwordJson && passwordJson->valuestring) {
-            const char* password = passwordJson->valuestring;
-            cJSON_AddStringToObject(CERTS_SETTINGS, "password", password);
-            ACAP_STATUS_SetBool("certificate", "password", 1);
-            
-            FILE* pwfile = ACAP_FILE_Open("localdata/ph.txt", "w");
-            if (pwfile) {
-                if (fwrite((void*)password, 1, strlen(password), pwfile) != strlen(password)) {
-                    LOG_WARN("Could not save password\n");
-                }
-                fclose(pwfile);
-            }
-        } else {
-            ACAP_STATUS_SetBool("certificate", "password", 0);
-        }
-        ACAP_STATUS_SetBool("certificate", "key", 1);
-    }
-
-    cJSON_Delete(postJson);
-    ACAP_HTTP_Respond_Text(response, "OK");
-}
-
-CERTS_Status CERTS_Init(void) {
+	const char *jsonData =  ACAP_HTTP_Request_Param( request, "json");
+	if(!jsonData) {
+		LOG_TRACE("%s: No action.  Respond with data\n", __func__);
+		cJSON* copy = cJSON_Duplicate( CERTS_SETTINGS,1 );
+		if( cJSON_GetObjectItem( copy,"password") ) {
+			cJSON_ReplaceItemInObject( copy,"password",cJSON_CreateString("") );
+		}
+		 ACAP_HTTP_Respond_JSON(response, copy );
+		 cJSON_Delete(copy);
+		 return;
+	}
 	
-    if (CERTS_SETTINGS) return CERTS_SUCCESS;
-    
-    CERTS_SETTINGS = cJSON_CreateObject();
-    if (!CERTS_SETTINGS) return CERTS_ERROR_MEMORY;
+	cJSON* data = cJSON_Parse( jsonData );
+	if(!data) {
+		ACAP_HTTP_Respond_Error( response, 400, "JSON Parse error" );
+		return;
+	}
+		
+	char* type = cJSON_GetObjectItem(data,"type")?cJSON_GetObjectItem(data,"type")->valuestring:0;
+	char* pem = cJSON_GetObjectItem(data,"pem")?cJSON_GetObjectItem(data,"pem")->valuestring:0;
+	char* password = cJSON_GetObjectItem(data,"password")?cJSON_GetObjectItem(data,"password")->valuestring:0;
+
+	if(!type) {
+		LOG_WARN("CERT: Type is missing\n");
+		 ACAP_HTTP_Respond_Error( response, 400, "Missing type" );
+		return;
+	}
+	
+	if(!pem) {
+		LOG_WARN("CERT: PEM is missing\n");
+		 ACAP_HTTP_Respond_Error( response, 400, "Missing pem" );
+		return;
+	}
+
+	if( !(strcmp(type,"ca")==0 || strcmp(type,"cert")==0 || strcmp(type,"key")==0) ) {
+		LOG_WARN("CERTS: Invalid type %s\n", type);
+		 ACAP_HTTP_Respond_Error( response, 400, "Missing type" );
+		return;
+	}
+
+	if( strcmp(type,"ca") == 0 ) {
+		if( strlen(pem) < 500 ) {
+			if( !cJSON_GetObjectItem(CERTS_SETTINGS,"cafile") ) {
+				 ACAP_HTTP_Respond_Text(response,"OK");
+				return;
+			}
+			if(  ACAP_FILE_Delete( "localdata/ca.pem" ) ) {
+				cJSON_DeleteItemFromObject(CERTS_SETTINGS,"cafile");
+				 ACAP_STATUS_SetBool("certificate","CA",0);
+				 ACAP_HTTP_Respond_Text(response,"OK");
+			} else {
+				LOG_WARN("Unable to remove CA file\n");
+				 ACAP_HTTP_Respond_Error(response,500,"Failed to remove");
+				return;
+			}
+		}
+	}
+
+	if( strcmp(type,"cert") == 0 ) {
+		if( strlen(pem) < 500 ) {
+			if( !cJSON_GetObjectItem(CERTS_SETTINGS,"certfile") ) {
+				 ACAP_HTTP_Respond_Text(response,"OK");
+				return;
+			}
+			if(  ACAP_FILE_Delete( "localdata/cert.pem" ) ) {
+				cJSON_DeleteItemFromObject(CERTS_SETTINGS,"certfile");
+				if(  ACAP_FILE_Delete( "localdata/key.pem" ) ) {
+					cJSON_DeleteItemFromObject(CERTS_SETTINGS,"keyfile");
+					if( cJSON_GetObjectItem(CERTS_SETTINGS,"password") ) {
+						 ACAP_FILE_Delete( "localdata/ph.txt" );
+						cJSON_DeleteItemFromObject(CERTS_SETTINGS,"password");
+					}
+				}				
+				 ACAP_STATUS_SetBool("certificate","cert", 0);
+				 ACAP_HTTP_Respond_Text(response,"OK");
+			} else {
+				LOG_WARN("Unable to remove certificate file\n");
+				 ACAP_HTTP_Respond_Error(response,500,"Failed to remove");
+				return;
+			}
+		}
+	}
+
+	if( strcmp(type,"key")==0 ) {
+		if( strlen(pem) < 500 ) {
+			if( !cJSON_GetObjectItem(CERTS_SETTINGS,"keyfile") ) {
+				 ACAP_HTTP_Respond_Text(response,"OK");
+				return;
+			}
+			if(  ACAP_FILE_Delete( "localdata/key.pem" ) ) {
+				 ACAP_FILE_Delete( "localdata/ph.txt" );
+				cJSON_DeleteItemFromObject(CERTS_SETTINGS,"keyfile");
+				if( cJSON_GetObjectItem(CERTS_SETTINGS,"password" ) ) {
+					cJSON_DeleteItemFromObject(CERTS_SETTINGS,"password");
+					 ACAP_STATUS_SetBool("certificate","password",0);
+				}
+				 ACAP_STATUS_SetBool("certificate","key",0);
+				 ACAP_HTTP_Respond_Text(response,"OK");
+			} else {
+				LOG_WARN("Unable to remove key file\n");
+				 ACAP_HTTP_Respond_Error(response,500,"Failed to remove");
+				return;
+			}
+		}
+	}
+	
+	LOG_TRACE("%s: Updating %s\n",__func__,type);
+
+	char filepath[128];
+	sprintf(filepath,"localdata/%s.pem",type);
+	LOG_TRACE("%s: Opening %s for writing\n",__func__,filepath);
+	FILE* file =  ACAP_FILE_Open(filepath, "w" );
+	if(!file) {
+		LOG_WARN("%s: Cannot open %s for writing\n",__func__,filepath);
+		 ACAP_HTTP_Respond_Error( response, 500, "Failed saving data");
+		return;
+	}
+	size_t pemSize = strlen(pem);
+	LOG_TRACE("%s: Saving data\n",__func__);
+	size_t length = fwrite( pem, pemSize, 1, file );
+	fclose(file);
+
+	if( length < 1 ) {
+		LOG_WARN("CERTS: Could not save cert data\n");
+		 ACAP_HTTP_Respond_Error( response, 500, "Failed saving data" );
+		return;
+	} else {
+		LOG_TRACE("%s: Data saveed in %s\n",__func__,filepath);
+	}
+	char fullpath[256]="";
+	sprintf(fullpath,"%s%s", ACAP_FILE_AppPath(),filepath);
+	if( strcmp(type,"cert") == 0 ) {
+		if( cJSON_GetObjectItem(CERTS_SETTINGS,"certfile") )
+			cJSON_ReplaceItemInObject(CERTS_SETTINGS,"certfile",cJSON_CreateString(fullpath));
+		else
+			cJSON_AddStringToObject(CERTS_SETTINGS,"certfile",fullpath);
+		 ACAP_STATUS_SetBool("certificate","cert",1);
+	}
+
+	if( strcmp(type,"key") == 0 ) {
+		if( cJSON_GetObjectItem(CERTS_SETTINGS,"keyfile") )
+			cJSON_ReplaceItemInObject(CERTS_SETTINGS,"keyfile",cJSON_CreateString(fullpath));
+		else
+			cJSON_AddStringToObject(CERTS_SETTINGS,"keyfile",fullpath);
+		
+		if( cJSON_GetObjectItem(CERTS_SETTINGS,"password") )
+			cJSON_DeleteItemFromObject(CERTS_SETTINGS,"password");
+		if( password ) {
+			LOG_TRACE("%s: Key with password\n",__func__);
+			cJSON_AddStringToObject(CERTS_SETTINGS,"password",password);
+			 ACAP_STATUS_SetBool("certificate","password",1);
+			
+			FILE* file =  ACAP_FILE_Open("localdata/ph.txt", "w" );
+			if(file) {
+				LOG_TRACE("%s: Saving password\n",__func__);
+				size_t length = fwrite( password, sizeof(char), strlen(password), file );
+				if( length < 1 )
+					LOG_WARN("%s: Could not save password\n",__func__);
+				fclose(file);
+			}
+		} else {
+			 ACAP_STATUS_SetBool("certificate","password",0);
+			LOG_TRACE("%s: No password set for key file\n",__func__);
+		}
+		 ACAP_STATUS_SetBool("certificate","key",1);
+	}
+
+	if( strcmp(type,"ca") == 0 ) {
+		if( cJSON_GetObjectItem(CERTS_SETTINGS,"cafile") )
+			cJSON_ReplaceItemInObject(CERTS_SETTINGS,"cafile",cJSON_CreateString(fullpath));
+		else
+			cJSON_AddStringToObject(CERTS_SETTINGS,"cafile",fullpath);
+		 ACAP_STATUS_SetBool("certificate","ca",1);
+	}
+	 ACAP_HTTP_Respond_Text( response, "OK" );
+}
+
+int
+CERTS_Init(){
+	CERTS_SETTINGS = cJSON_CreateObject();
 
 	char * buffer;
 	size_t length;
 
-    // Initialize status
-    ACAP_STATUS_SetBool("certificate", "ca", 0);
-    ACAP_STATUS_SetBool("certificate", "cert", 0);
-    ACAP_STATUS_SetBool("certificate", "key", 0);
-    ACAP_STATUS_SetBool("certificate", "password", 0);
+	LOG_TRACE("%s: Entry\n", __func__);
 
-	FILE* file = ACAP_FILE_Open("localdata/cert.pem", "r" );
+	 ACAP_STATUS_SetBool("certificate","ca",0);
+	 ACAP_STATUS_SetBool("certificate","cert",0);
+	 ACAP_STATUS_SetBool("certificate","key",0);
+	 ACAP_STATUS_SetBool("certificate","password",0);
+
+	FILE* file =  ACAP_FILE_Open("localdata/cert.pem", "r" );
 	if(file) {
-		LOG_TRACE("Loading cert.pem\n");
+		LOG_TRACE("%s: Loading cert.pem\n", __func__);
 		fseek(file , 0 , SEEK_END);
 		long lSize = ftell(file);
 		if( lSize < 9000 ) {
@@ -323,10 +297,10 @@ CERTS_Status CERTS_Init(void) {
 			if( length > 50 ) {
 				if( strstr( buffer, "-----BEGIN CERTIFICATE-----") > 0 ) {
 					char filepath[256];
-					sprintf(filepath,"%s%s",ACAP_FILE_AppPath(),"localdata/cert.pem");
+					sprintf(filepath,"%s%s", ACAP_FILE_AppPath(),"localdata/cert.pem");
 					cJSON_AddStringToObject(CERTS_SETTINGS, "certfile", filepath );
-					LOG_TRACE("Client certificate loaded\n");
-					ACAP_STATUS_SetBool("certificate","cert",0);
+					LOG_TRACE("%s: Client certificate loaded\n", __func__);
+					 ACAP_STATUS_SetBool("certificate","cert",0);
 				} else {
 					LOG_WARN("Could not load certificate file.  File corrupt or empty\n");
 				}
@@ -339,12 +313,12 @@ CERTS_Status CERTS_Init(void) {
 		}
 		fclose(file);
 	} else {
-		LOG_TRACE("No client certificate loaded\n");
+		LOG_TRACE("%s: No client certificate loaded\n",__func__);
 	}
 
-	file = ACAP_FILE_Open("localdata/key.pem", "r" );
+	file =  ACAP_FILE_Open("localdata/key.pem", "r" );
 	if(file) {
-		LOG_TRACE("Loading key.pem\n");
+		LOG_TRACE("%s:Loading key.pem\n",__func__);
 		fseek(file , 0 , SEEK_END);
 		long lSize = ftell(file);
 		if( lSize < 9000 ) {
@@ -357,15 +331,11 @@ CERTS_Status CERTS_Init(void) {
 			rewind(file);
 			length = fread ( buffer, sizeof(char), lSize, file );
 			if( length > 50 ) {
-				if( strstr( buffer, "-----BEGIN RSA PRIVATE KEY-----") > 0 ) {
-					char filepath[256];
-					sprintf(filepath,"%s%s",ACAP_FILE_AppPath(),"localdata/key.pem");
-					cJSON_AddStringToObject(CERTS_SETTINGS, "keyfile", filepath );
-					LOG_TRACE("Private certificate key loaded");
-					ACAP_STATUS_SetBool("certificate","key",1);
-				} else {
-					LOG_WARN("Could not load key file.  PEM file is corrupt\n");
-				}
+				char filepath[256];
+				sprintf(filepath,"%s%s", ACAP_FILE_AppPath(),"localdata/key.pem");
+				cJSON_AddStringToObject(CERTS_SETTINGS, "keyfile", filepath );
+				LOG_TRACE("%s: Private certificate key loaded", __func__);
+				ACAP_STATUS_SetBool("certificate","key",1);
 			} else {
 				LOG_WARN("Could not load key file.  File corrupt or empty\n");
 			}
@@ -375,12 +345,12 @@ CERTS_Status CERTS_Init(void) {
 		}
 		fclose(file);
 	} else {
-		LOG_TRACE("No client certificate private loaded\n");
+		LOG_TRACE("%s: No client certificate private loaded\n", __func__);
 	}
 
-	file = ACAP_FILE_Open("localdata/ca.pem", "r" );
+	file =  ACAP_FILE_Open("localdata/ca.pem", "r" );
 	if(file) {
-		LOG_TRACE("Loading ca.pem\n");
+		LOG_TRACE("%s: Loading ca.pem\n", __func__);
 		fseek(file , 0 , SEEK_END);
 		long lSize = ftell(file);
 		if( lSize < 9000 ) {
@@ -395,10 +365,10 @@ CERTS_Status CERTS_Init(void) {
 			if( length > 50 ) {
 				if( strstr( buffer, "-----BEGIN CERTIFICATE-----") > 0 ) {
 					char filepath[256];
-					sprintf(filepath,"%s%s",ACAP_FILE_AppPath(),"localdata/ca.pem");
+					sprintf(filepath,"%s%s", ACAP_FILE_AppPath(),"localdata/ca.pem");
 					cJSON_AddStringToObject(CERTS_SETTINGS, "cafile", filepath );
-					LOG_TRACE("CA Certificate loaded");
-					ACAP_STATUS_SetBool("certificate","ca",1);
+					LOG_TRACE("%s: CA Certificate loaded", __func__);
+					 ACAP_STATUS_SetBool("certificate","ca",1);
 				} else {
 					LOG_WARN("Could not load CA file.  Invalid or corrupt\n");
 				}
@@ -411,11 +381,11 @@ CERTS_Status CERTS_Init(void) {
 		}
 		fclose(file);
 	} else {
-		LOG_TRACE("CA file not avaialable\n");
+		LOG_TRACE("%s: CA file not avaialable\n", __func__);
 	}
 
-	ACAP_STATUS_SetBool("certificate","password",0);
-	file = ACAP_FILE_Open("localdata/ph.txt", "r" );
+	 ACAP_STATUS_SetBool("certificate","password",0);
+	file =  ACAP_FILE_Open("localdata/ph.txt", "r" );
 	if(file) {
 		fseek(file , 0 , SEEK_END);
 		long lSize = ftell(file);
@@ -430,7 +400,7 @@ CERTS_Status CERTS_Init(void) {
 			length = fread ( buffer, sizeof(char), lSize, file );
 			if( length > 3 ) {
 				cJSON_AddStringToObject(CERTS_SETTINGS, "password", buffer );
-				ACAP_STATUS_SetBool("certificate","password",0);
+				 ACAP_STATUS_SetBool("certificate","password",0);
 			} else {
 				LOG_WARN("CERT: Invalid or currupt file\n");
 			}
@@ -439,20 +409,6 @@ CERTS_Status CERTS_Init(void) {
 		fclose(file);
 	}
 	LOG_TRACE("%s: setting http node\n",__func__);
-
-    // Register HTTP endpoint
-    if (!ACAP_HTTP_Node("certs", CERTS_HTTP_Callback)) {
-        cJSON_Delete(CERTS_SETTINGS);
-        CERTS_SETTINGS = NULL;
-        return CERTS_ERROR_INIT;
-    }
-
-    return CERTS_SUCCESS;
-}
-
-void CERTS_Cleanup(void) {
-    if (CERTS_SETTINGS) {
-        cJSON_Delete(CERTS_SETTINGS);
-        CERTS_SETTINGS = NULL;
-    }
+	 ACAP_HTTP_Node( "certs", CERTS_HTTP );
+	return 1;
 }

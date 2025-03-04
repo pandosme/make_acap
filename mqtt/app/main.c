@@ -71,10 +71,16 @@ HTTP_ENDPOINT_Publish(ACAP_HTTP_Response response,const ACAP_HTTP_Request reques
 }
 
 void 
-Connection_Status (int state) {
+MQTT_Status_Callback (int state) {
 	switch( state ) {
 		case MQTT_CONNECT:
 			LOG_TRACE("%s: Connect\n",__func__);
+			char topic[64];
+			sprintf(topic,"connect/%s",ACAP_DEVICE_Prop("serial"));
+			cJSON* connection = cJSON_CreateObject();
+			cJSON_AddTrueToObject(connection,"connected");
+			cJSON_AddStringToObject(connection,"address",ACAP_DEVICE_Prop("IPv4"));
+			MQTT_Publish_JSON(topic,connection,0,1);
 			break;
 		case MQTT_RECONNECT:
 			LOG("%s: Reconnect\n",__func__);
@@ -110,7 +116,7 @@ main(void) {
 	ACAP( APP_PACKAGE, Settings_Updated_Callback );
 	ACAP_HTTP_Node("publish", HTTP_ENDPOINT_Publish );
 
-	MQTT_Init( APP_PACKAGE, Connection_Status );
+	MQTT_Init( APP_PACKAGE, MQTT_Status_Callback );
 	MQTT_Subscribe( "mqtt", Subscription );
 	
 	main_loop = g_main_loop_new(NULL, FALSE);

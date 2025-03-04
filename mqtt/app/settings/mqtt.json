@@ -5,7 +5,7 @@
 	"user":"",
 	"password":"",
 	"clientID":"",
-	"preTopic":"",
+	"preTopic":"mqttdemo",
 	"tls": false,
 	"verify": false,
 	"lwt":null,
