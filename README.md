@@ -271,18 +271,34 @@ Subscriptions are declared in `app/subscriptions` as a list of topic objects. Yo
 
 **Common Event Topics Table:**
 
-| Event Name                       | TOPIC0                      | TOPIC1                | TOPIC2             | TOPIC3                |
-|----------------------------------|-----------------------------|-----------------------|--------------------|-----------------------|
-| Object Analytics: Scenario 1     | tnsaxis:CameraApplicationPlatform | tnsaxis:ObjectAnalytics | tnsaxis:Device1Scenario1 |                       |
-| VMD 4: Any Profile               | tnsaxis:CameraApplicationPlatform | tnsaxis:VMD           | tnsaxis:Camera1ProfileANY |                    |
-| Motion                           | tns1:RuleEngine             | tns1:MotionRegionDetector | tns1:Motion         |                       |
-| Virtual input                    | tns1:Device                 | tnsaxis:IO            | tnsaxis:VirtualInput |                      |
-| Digital input port               | tns1:Device                 | tnsaxis:IO            | tnsaxis:Port        |                       |
-| Day night vision                 | tns1:VideoSource            | tnsaxis:DayNightVision |                    |                       |
-| Scheduled event                  | tns1:UserAlarm              | tnsaxis:Recurring     | tnsaxis:Interval    |                       |
-| ...                              | ...                         | ...                   | ...                | ...                   |
-
-For a full list, see the template or Axis documentation[1].
+Common events and their topic nodes:
+| Event Name | TOPIC0 | TOPIC1 | TOPIC2 | TOPIC3 |
+|------------|--------|--------|---------|---------|
+| Object Analytics: Scenario 1 | tnsaxis:CameraApplicationPlatform | tnsaxis:ObjectAnalytics | tnsaxis:Device1Scenario1 | |
+| Object Analytics: Any Scenario | tnsaxis:CameraApplicationPlatform | tnsaxis:ObjectAnalytics | tnsaxis:Device1ScenarioANY | |
+| VMD 4: Any Profile | tnsaxis:CameraApplicationPlatform | tnsaxis:VMD | tnsaxis:Camera1ProfileANY | |
+| VMD 4: Profile 1 | tnsaxis:CameraApplicationPlatform | tnsaxis:VMD | tnsaxis:Camera1Profile1 | |
+| Motion | tns1:RuleEngine | tns1:MotionRegionDetector | tns1:Motion | |
+| VMD 3 | tns1:RuleEngine | tnsaxis:VMD3 | tnsaxis:vmd3_video_1 | |
+| Node-RED:Event | tnsaxis:CameraApplicationPlatform | tnsaxis:Node-RED | tnsaxis:event | |
+| Node-RED:State | tnsaxis:CameraApplicationPlatform | tnsaxis:Node-RED | tnsaxis:state | |
+| Node-RED:Data | tnsaxis:CameraApplicationPlatform | tnsaxis:Node-RED | tnsaxis:data | |
+| MQTT Trigger | tnsaxis:MQTT | tnsaxis:Message | tnsaxis:Stateless | |
+| Virtual input | tns1:Device | tnsaxis:IO | tnsaxis:VirtualInput | |
+| Manual trigger | tns1:Device | tnsaxis:IO | tnsaxis:VirtualPort | |
+| Digital output port | tns1:Device | tnsaxis:IO | tnsaxis:OutputPort | |
+| Digital input port | tns1:Device | tnsaxis:IO | tnsaxis:Port | |
+| Digital Input | tns1:Device | tns1:Trigger | tns1:DigitalInput | |
+| Live stream accessed | tns1:VideoSource | tnsaxis:LiveStreamAccessed | | |
+| Camera tampering | tns1:VideoSource | tnsaxis:Tampering | | |
+| Day night vision | tns1:VideoSource | tnsaxis:DayNightVision | | |
+| Scheduled event | tns1:UserAlarm | tnsaxis:Recurring | tnsaxis:Interval | |
+| Recording ongoing | tnsaxis:Storage | tnsaxis:Recording | | |
+| Within operating temperature | tns1:Device | tnsaxis:Status | tnsaxis:Temperature | tnsaxis:Inside |
+| Above operating temperature | tns1:Device | tnsaxis:Status | tnsaxis:Temperature | tnsaxis:Above |
+| Above or below operating temperature | tns1:Device | tnsaxis:Status | tnsaxis:Temperature | tnsaxis:Above_or_below |
+| Below operating temperature | tns1:Device | tnsaxis:Status | tnsaxis:Temperature | tnsaxis:Below |
+| Relays and Outputs | tns1:Device | tns1:Trigger | tns1:Relay | |
 
 ---
 
@@ -356,7 +372,7 @@ int main(void) {
 This README is designed for clarity, completeness, and easy parsing by both human developers and LLM-based assistants. It includes detailed explanations, code snippets, and tables for event topics, ensuring a robust foundation for ACAP development[1][3][4].
 
 Citations:  
-[1] https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/10509012/75de2d87-5dcf-47b5-a643-5d480e766b07/paste.txt  
+[1] https://github.com/AxisCommunications/acap-native-sdk-examples
 [2] https://github.com/AxisCommunications/acap3-examples
 [3] https://github.com/pandosme/make_acap  
 [4] https://github.com/AxisCommunications/acap-native-sdk-examples  
