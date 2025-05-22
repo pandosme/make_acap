@@ -407,8 +407,8 @@ int main(void) {
 This README is designed for clarity, completeness, and easy parsing by both human developers and LLM-based assistants. It includes detailed explanations, code snippets, and tables for event topics, ensuring a robust foundation for ACAP development[1][3][4].
 
 Citations:  
-[1] https://github.com/AxisCommunications/acap-native-sdk-examples
-[2] https://github.com/AxisCommunications/acap3-examples
+[1] https://github.com/AxisCommunications/acap-native-sdk-examples  
+[2] https://github.com/AxisCommunications/acap3-examples  
 [3] https://github.com/pandosme/make_acap  
 [4] https://github.com/AxisCommunications/acap-native-sdk-examples  
 [5] https://axiscommunications.github.io/acap-documentation/3.5/api/axevent/html/ax__event__key__value__set_8h.html  
