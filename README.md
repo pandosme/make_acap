@@ -96,6 +96,33 @@ COPY ./app .
 RUN . /opt/axis/acapsdk/environment-setup* && acap-build .
 ```
 
+## manifest.json
+The manifest defines sveral properties for the project and what resources it will use. It is very important that the manifest is complete and correct. [More info about manifest.json](https://developer.axis.com/acap/acap-sdk-version-3/develop-applications/application-project-structure/#manifest-file)  
+Here is a typical manifest.json that defines ACAP, name, version, user interface page and HTTP enpoint it exposes.  
+```
+{
+    "schemaVersion": "1.7.1",
+    "acapPackageConf": {
+        "setup": {
+            "friendlyName": "Base",
+            "appName": "base",
+            "vendor": "Fred Juhlin",
+            "embeddedSdkVersion": "3.0",
+            "vendorUrl": "https://pandosme.github.io",
+            "runMode": "once",
+            "version": "4.0.0"
+        },
+        "configuration": {
+			"settingPage": "index.html",
+			"httpConfig": [
+				{"name": "app","access": "admin","type": "fastCgi"},
+				{"name": "settings","access": "admin","type": "fastCgi"},
+				{"name": "capture","access": "admin","type": "fastCgi"},
+				{"name": "fire","access": "admin","type": "fastCgi"}
+			]
+		}
+    }
+}
 
 ---
 
