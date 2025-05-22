@@ -25,6 +25,11 @@ ACAP is an open application platform that enables you to develop and deploy appl
 
 ---
 
+## Template Examples
+- base:  Provides a user interface that demonstrates how to capture an image, alter settings and fire events
+- event_subscription: Demostrates how an ACAP can monitor events to create actions
+- mqtt: Demonstrate how to instance an MQTT client and connect it to an MQTT broker
+
 ## Quick Start
 
 1. **Clone the Template**
