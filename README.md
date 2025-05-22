@@ -179,15 +179,18 @@ void Settings_Updated_Callback(const char* property, cJSON* data) {
 
 ## HTTP Endpoints
 
-Endpoints are used for UI and API integration. Define them in `manifest.json` and register them in your code.
+Endpoints are used for UI and API integration. Define them in `manifest.json` and register them in your code.  The template ACAP has two predefined end points
+1. GET app   Responds with all information a page may have including settings, manifest, device info and more
+2. GET settings  Responds with the ACAP settings
+3. POST settings  Post updates on one or more settings properties
 
 **Manifest Example:**
 ```json
 "httpConfig": [
   {"name": "app", "access": "admin", "type": "fastCgi"},
   {"name": "settings", "access": "admin", "type": "fastCgi"},
-  {"name": "capture", "access": "admin", "type": "fastCgi"},
-  {"name": "fire", "access": "admin", "type": "fastCgi"}
+  {"name": "capture", "access": "admin", "type": "fastCgi"},  <-- Customized end point
+  {"name": "fire", "access": "admin", "type": "fastCgi"}  <-- Customized end point
 ]
 ```
 
