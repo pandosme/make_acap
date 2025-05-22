@@ -83,6 +83,79 @@ docker cp $(docker create acap):/opt/app ./build
 cp build/*.eap .
 ```
 
+### Customized package name and frienly name
+When changing the package name there are four places that needs to be updated
+1. app/Makefile
+```
+   PROG1	= myOwnACAP
+```
+2. app/main.c
+```
+	#define APP_PACKAGE	"myOwnACAP"
+```
+3. app/manifest.json   
+```
+   "friendlyName": "My Own ACAP",
+```
+
+### Settings
+The template ACAP includes supprt for configuration settings.  These settings are declared in app/settings/settings.json
+
+### Pre-configured HTTP endpoints
+The template ACAP defines the following HTTP end points for common operations
+GET  app          Provides all settings, manifest, device information that a page may need to show values
+GET  settings     For a page that only wants the settings.  Note that settings is included as a property with GET app
+POST settings     Updating one or more properties in settings
+
+### Custom HTTP Endpoints
+The http enpoints are mainly used for the ACAP web user interface to set configuration, monitoring or visualization.
+Every endpoint Endpoints needs to be defined
+
+### Events
+The common outout integration with other systems is typically using device events.  Events are defined in app/settings/events.json.
+The properties are
+"id": This is a unique string that the system will monitor/subscribe to
+"name": This is a string that provide a nice name for the installer to select the right event
+"state": This is a boolean that defines if the event is stateful or a pulse.  E.g. "motion is high" or "tripwire just triggered"
+"show": This is a boolean that defines if the event should be users to select or if this event is only for a specific application.
+"data": An array providing additional data that the consumer needs.
+
+Events are fired in the code using
+Stateful event
+```
+	ACAP_EVENTS_Fire_State( "myOwnStatefulEvent", 1 );  //Sets the event high.  0 sets is low
+```
+Trigger event
+```
+	ACAP_EVENTS_Fire( "myOwnTriggerEvent");
+```
+
+### Events subscriptions
+An ACAP can subscribe to internal events to trigger an internal action.  Event subscriptions are declared in app/subscriptions.
+Events are declared in a topic tree structure and they use name spaces to reduce the risk of collision with the ONVIF pre-defined topics.
+An ACAP can subscript to a topic branch (getting all events fired under that branch) or a specific event.  Exampels
+```
+[
+	{
+		"name": "All ACAP Events",
+		"topic0": {"tnsaxis":"CameraApplicationPlatform"}
+	},
+	},
+	{
+		"name": "Camera Day and Night Switching",
+		"topic0": {"tns1":"VideoSource"},
+		"topic1": {"tnsaxis":"DayNightVision"}
+	},
+	{
+		"name": "Virtual Input",
+		"topic0": {"tns1":"Device"},
+		"topic1": {"tnsaxis":"IO"},
+		"topic2": {"tnsaxis":"VirtualInput"}
+	}
+]
+```
+
+
 ### Example of a typical Dockerfile
 ```
 ARG ARCH=armv7hf

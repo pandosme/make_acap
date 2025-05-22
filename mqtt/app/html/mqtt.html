@@ -278,7 +278,7 @@ $("#connect").click(function() {
 			},
 			error: function(response) {
 				if( settings.tls === true && settings.verify === true ) {
-					showToast("<b>Unable to connect.<b/><br\>Check:<br\>* Address<br\>* User/Password<br/>* Certificate verification","warning");
+					showToast("<b>Unable to connect.</b><br\>Check:<br\>* Address<br\>* User/Password<br/>* Certificate verification","warning");
 					button.prop("disabled", false);
 					return;
 				}
