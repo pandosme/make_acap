@@ -355,15 +355,15 @@ int main(void) {
 
 This README is designed for clarity, completeness, and easy parsing by both human developers and LLM-based assistants. It includes detailed explanations, code snippets, and tables for event topics, ensuring a robust foundation for ACAP development[1][3][4].
 
-Citations:
-[1] https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/10509012/75de2d87-5dcf-47b5-a643-5d480e766b07/paste.txt
+Citations:  
+[1] https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/10509012/75de2d87-5dcf-47b5-a643-5d480e766b07/paste.txt  
 [2] https://github.com/AxisCommunications/acap3-examples
-[3] https://github.com/pandosme/make_acap
-[4] https://github.com/AxisCommunications/acap-native-sdk-examples
-[5] https://axiscommunications.github.io/acap-documentation/3.5/api/axevent/html/ax__event__key__value__set_8h.html
-[6] https://axiscommunications.github.io/acap-documentation/3.5/api/axevent/html/ax_event_stateless_declaration_example_8c-example.html
-[7] https://developer.axis.com/acap/introduction/acap-sdk-overview/
-[8] https://developer.axis.com/computer-vision/computer-vision-on-device/develop-your-own-deep-learning-application/
-[9] https://experienceleague.adobe.com/en/docs/experience-platform/assurance/view/event-transactions
-[10] https://developer.axis.com/vapix/applications/fence-guard/
-[11] https://www.acapcommunity.org/wp-content/uploads/2023/06/Technical-Notes-Pre-Event-Looping-Slide-Deck-Updated_23Jun2023.pdf
+[3] https://github.com/pandosme/make_acap  
+[4] https://github.com/AxisCommunications/acap-native-sdk-examples  
+[5] https://axiscommunications.github.io/acap-documentation/3.5/api/axevent/html/ax__event__key__value__set_8h.html  
+[6] https://axiscommunications.github.io/acap-documentation/3.5/api/axevent/html/ax_event_stateless_declaration_example_8c-example.html  
+[7] https://developer.axis.com/acap/introduction/acap-sdk-overview/  
+[8] https://developer.axis.com/computer-vision/computer-vision-on-device/develop-your-own-deep-learning-application/  
+[9] https://experienceleague.adobe.com/en/docs/experience-platform/assurance/view/event-transactions  
+[10] https://developer.axis.com/vapix/applications/fence-guard/  
+[11] https://www.acapcommunity.org/wp-content/uploads/2023/06/Technical-Notes-Pre-Event-Looping-Slide-Deck-Updated_23Jun2023.pdf  
