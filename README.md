@@ -47,6 +47,19 @@ Detailed information can be found at https://axiscommunications.github.io/acap-d
 * Knowledge in HTML, JavaScript and CSS for the ACAP user interface
 
 # Template project description
+## Quick start
+1. Clone ACAP Template Directory
+```git clone https://github.com/pandosme/make_acap.git```
+2. Go to selected project
+```cd make_acap/base```
+3. Build ACAP
+```. build.sh```
+4. Install ACAP
+5. Alter to code and make a custom service
+- main.c
+- manifest.json
+- Makefile
+
 ## Directory structure
 ```
 .
@@ -84,32 +97,54 @@ cp build/*.eap .
 ```
 
 ### Customized package name and frienly name
-When changing the package name there are four places that needs to be updated
+When changing the package name there are four places that needs to be updated.
+Example creating an ACAP with the name "My Own ACAP"
 1. app/Makefile
 ```
-   PROG1	= myOwnACAP
+PROG1 = myOwnACAP
 ```
 2. app/main.c
 ```
-	#define APP_PACKAGE	"myOwnACAP"
+#define APP_PACKAGE "myOwnACAP"
 ```
 3. app/manifest.json   
 ```
-   "friendlyName": "My Own ACAP",
+"package": "myOwnACAP",
+"friendlyName": "My Own ACAP",
 ```
 
 ### Settings
-The template ACAP includes supprt for configuration settings.  These settings are declared in app/settings/settings.json
+The template ACAP includes supprt for configuration settings.  These settings are declared in app/settings/settings.json.  When the settings are updated via the HTTP endpoint "settings",
+a the updated properties are caugt with a callback function.
+```
+void
+Settings_Updated_Callback( const char* property, cJSON* data) {
+  char* json = cJSON_PrintUnformatted(data);
+  LOG_TRACE("%s: Property=%s Data=%s\n",__func__, property, json);
+  free(json);
+}
+```
 
 ### Pre-configured HTTP endpoints
 The template ACAP defines the following HTTP end points for common operations
-GET  app          Provides all settings, manifest, device information that a page may need to show values
+GET  app          Provides all settings, manifest, device information that a page may need to show and process values in the ACAP.
 GET  settings     For a page that only wants the settings.  Note that settings is included as a property with GET app
 POST settings     Updating one or more properties in settings
 
 ### Custom HTTP Endpoints
 The http enpoints are mainly used for the ACAP web user interface to set configuration, monitoring or visualization.
-Every endpoint Endpoints needs to be defined
+Every endpoint Endpoints needs to be defined in app/manifest.json property acapPackageConf.configuration
+```
+{
+  "settingPage": "index.html",
+  "httpConfig": [
+    {"name": "app","access": "admin","type": "fastCgi"},
+    {"name": "settings","access": "admin","type": "fastCgi"},
+    {"name": "capture","access": "admin","type": "fastCgi"},  <---- Custom endpoint
+    {"name": "fire","access": "admin","type": "fastCgi"}      <---- Custom endpoint
+  ]
+}
+```			
 
 ### Events
 The common outout integration with other systems is typically using device events.  Events are defined in app/settings/events.json.
@@ -123,11 +158,11 @@ The properties are
 Events are fired in the code using
 Stateful event
 ```
-	ACAP_EVENTS_Fire_State( "myOwnStatefulEvent", 1 );  //Sets the event high.  0 sets is low
+ACAP_EVENTS_Fire_State( "myOwnStatefulEvent", 1 );  //Sets the event high.  0 sets is low
 ```
 Trigger event
 ```
-	ACAP_EVENTS_Fire( "myOwnTriggerEvent");
+ACAP_EVENTS_Fire( "myOwnTriggerEvent");
 ```
 
 ### Events subscriptions
@@ -154,6 +189,35 @@ An ACAP can subscript to a topic branch (getting all events fired under that bra
 	}
 ]
 ```
+Common events and their topic nodes:
+| Event Name | TOPIC0 | TOPIC1 | TOPIC2 | TOPIC3 |
+|------------|--------|--------|---------|---------|
+| Object Analytics: Scenario 1 | tnsaxis:CameraApplicationPlatform | tnsaxis:ObjectAnalytics | tnsaxis:Device1Scenario1 | |
+| Object Analytics: Any Scenario | tnsaxis:CameraApplicationPlatform | tnsaxis:ObjectAnalytics | tnsaxis:Device1ScenarioANY | |
+| VMD 4: Any Profile | tnsaxis:CameraApplicationPlatform | tnsaxis:VMD | tnsaxis:Camera1ProfileANY | |
+| VMD 4: Profile 1 | tnsaxis:CameraApplicationPlatform | tnsaxis:VMD | tnsaxis:Camera1Profile1 | |
+| Motion | tns1:RuleEngine | tns1:MotionRegionDetector | tns1:Motion | |
+| VMD 3 | tns1:RuleEngine | tnsaxis:VMD3 | tnsaxis:vmd3_video_1 | |
+| Node-RED:Event | tnsaxis:CameraApplicationPlatform | tnsaxis:Node-RED | tnsaxis:event | |
+| Node-RED:State | tnsaxis:CameraApplicationPlatform | tnsaxis:Node-RED | tnsaxis:state | |
+| Node-RED:Data | tnsaxis:CameraApplicationPlatform | tnsaxis:Node-RED | tnsaxis:data | |
+| MQTT Trigger | tnsaxis:MQTT | tnsaxis:Message | tnsaxis:Stateless | |
+| Virtual input | tns1:Device | tnsaxis:IO | tnsaxis:VirtualInput | |
+| Manual trigger | tns1:Device | tnsaxis:IO | tnsaxis:VirtualPort | |
+| Digital output port | tns1:Device | tnsaxis:IO | tnsaxis:OutputPort | |
+| Digital input port | tns1:Device | tnsaxis:IO | tnsaxis:Port | |
+| Digital Input | tns1:Device | tns1:Trigger | tns1:DigitalInput | |
+| Live stream accessed | tns1:VideoSource | tnsaxis:LiveStreamAccessed | | |
+| Camera tampering | tns1:VideoSource | tnsaxis:Tampering | | |
+| Day night vision | tns1:VideoSource | tnsaxis:DayNightVision | | |
+| Scheduled event | tns1:UserAlarm | tnsaxis:Recurring | tnsaxis:Interval | |
+| Recording ongoing | tnsaxis:Storage | tnsaxis:Recording | | |
+| Within operating temperature | tns1:Device | tnsaxis:Status | tnsaxis:Temperature | tnsaxis:Inside |
+| Above operating temperature | tns1:Device | tnsaxis:Status | tnsaxis:Temperature | tnsaxis:Above |
+| Above or below operating temperature | tns1:Device | tnsaxis:Status | tnsaxis:Temperature | tnsaxis:Above_or_below |
+| Below operating temperature | tns1:Device | tnsaxis:Status | tnsaxis:Temperature | tnsaxis:Below |
+| Relays and Outputs | tns1:Device | tns1:Trigger | tns1:Relay | |
+
 
 
 ### Example of a typical Dockerfile
@@ -414,53 +478,6 @@ int main(void) {
 ...
 }
 ```
-
-### Event Fire
-An ACAP service will typically fire an event when something occurs/detected in the ACAP Service.  
-1. Add file ./app/settings/events.json that defined the events.  Events may be triggere or stateful (having high and low states)
-2. Initialize the ACAP wrapper
-2. Call the fire events finctions in ACAP.h and ACAP.c
-
-Typical events.json
-```
-[	
-	{
-		"id": "theStateEvent",
-		"name": "Demo: State",
-		"state": true,
-		"show": true,
-		"data": []
-	},
-	{
-		"id": "theTriggerEvent",
-		"name": "Demo: Trigger",
-		"state": false,
-		"show": true,
-		"data": []
-	}
-]
-```
-In your code
-```
-	ACAP_EVENTS_Fire_State( "theStateEvent", 1 );
-	ACAP_EVENTS_Fire_State( "theStateEvent", 0 );
-	ACAP_EVENTS_Fire( "theTriggerEvent" );
-```
-
-## Get started Quickly
-1. Clone ACAP Template Directory
-```git clone https://github.com/pandosme/make_acap.git```
-2. Go to selected project
-```cd make_acap/base```
-3. Build ACAP
-```. build.sh```
-4. Install ACAP
-5. Alter to code and make a custom service
-- main.c
-- manifest.json
-- Makefile
-
-
 
 ## Additional Resources
 - [Axis ACAP SDK Documentation](https://www.axis.com/developer-community)
