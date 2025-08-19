@@ -6,8 +6,8 @@
     <title></title>
     <link rel="stylesheet" href="css/bootstrap.min.css">
     <link rel="stylesheet" href="css/app.css">
-    <script src="js/jquery.min.js"></script>
-    <script src="js/bootstrap.min.js"></script>
+    <script src="js/jquery-3.7.1.min.js"></script>
+    <script src="js/bootstrap.bundle.min.js"></script>
 </head>
 <body>
 <div class="d-flex" id="wrapper">
@@ -23,7 +23,6 @@
 	</div>
 
 	<div id="page-content-wrapper" class="p-0">
-
 		<div class="container-fluid">
 			<div class="col-12 col-md-6 col-lg-3">
 				<div class="card">
@@ -31,15 +30,14 @@
 						<h5 class="card-title mb-0">Events</h5>
 					</div>
 					<div class="card-body">
-						<div class="custom-control-switch">
-							<label for="event-state-switch">State</label>
-							<div class="custom-control custom-switch">
-								<input type="checkbox" class="custom-control-input" id="event-state-switch">
-								<label class="custom-control-label" for="event-state-switch"></label>
-							</div>
-						</div>
-						<button id="trigger-event" class="btn btn-primary btn-block mt-2">
-							Trigger Event
+						<button id="trigger-stateless" class="btn btn-primary btn-block mb-2">
+							Trigger Stateless Event
+						</button>
+						<button id="trigger-state-on" class="btn btn-success btn-block mb-2">
+							Trigger Stateful Event (On)
+						</button>
+						<button id="trigger-state-off" class="btn btn-danger btn-block">
+							Trigger Stateful Event (Off)
 						</button>
 					</div>
 				</div>
@@ -47,9 +45,10 @@
 		</div>
 	</div>
 </div>
+
 <script>
 $(document).ready(function() {
-	// Main AJAX call
+	// Fetch device info
 	$.ajax({
 		type: "GET",
 		url: 'app',
@@ -58,7 +57,6 @@ $(document).ready(function() {
 		success: function(data) {
 			document.title = data.manifest.acapPackageConf.setup.friendlyName;
 			$('.sidebar-heading').text(data.manifest.acapPackageConf.setup.friendlyName);
-
 		},
 		error: function(response) {
 			alert('Failed to load device information: ' + response.statusText);
@@ -66,37 +64,41 @@ $(document).ready(function() {
 	});
 });
 
-$('#event-state-switch').on('change', function() {
-	const isChecked = $(this).is(':checked');
-	const stateValue = isChecked ? 1 : 0;
-	
-	// Send event state change
-	$.ajax({
-		type: "GET",
-		url: 'fire?id=state&value=' + stateValue,
-		success: function() {
-		},
-		error: function() {
-			console.error('Failed to set event state');
-			// Revert switch if request fails
-			$('#event-state-switch').prop('checked', !isChecked);
-		}
-	});
-});
-
-// Trigger event button
-$('#trigger-event').on('click', function() {
+// Stateless event
+$('#trigger-stateless').on('click', function() {
 	$.ajax({
 		type: "GET",
 		url: "fire?id=trigger",
-		success: function() {
-		},
+		success: function() {},
 		error: function() {
-			console.error('Failed to trigger event');
+			console.error('Failed to trigger stateless event');
 		}
 	});
 });
 
+// Stateful event ON
+$('#trigger-state-on').on('click', function() {
+	$.ajax({
+		type: "GET",
+		url: "fire?id=state&value=1",
+		success: function() {},
+		error: function() {
+			console.error('Failed to set state ON');
+		}
+	});
+});
+
+// Stateful event OFF
+$('#trigger-state-off').on('click', function() {
+	$.ajax({
+		type: "GET",
+		url: "fire?id=state&value=0",
+		success: function() {},
+		error: function() {
+			console.error('Failed to set state OFF');
+		}
+	});
+});
 </script>
 </body>
 </html>

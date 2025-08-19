@@ -8,13 +8,14 @@
             "embeddedSdkVersion": "3.0",
             "vendorUrl": "https://pandosme.github.io",
             "runMode": "once",
-            "version": "4.3.1"
+            "version": "4.4.0"
         },
         "configuration": {
 			"settingPage": "index.html",
 			"httpConfig": [
 				{"name": "app","access": "admin","type": "fastCgi"},
 				{"name": "settings","access": "admin","type": "fastCgi"},
+				{"name": "status","access": "admin","type": "fastCgi"},
 				{"name": "capture","access": "admin","type": "fastCgi"},
 				{"name": "fire","access": "admin","type": "fastCgi"}
 			]

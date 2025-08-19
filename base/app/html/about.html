@@ -6,10 +6,9 @@
     <title></title>
     <link rel="stylesheet" href="css/bootstrap.min.css">
     <link rel="stylesheet" href="css/app.css">
-    <script src="js/jquery.min.js"></script>
-    <script src="js/bootstrap.min.js"></script>
+    <script src="js/jquery-3.7.1.min.js"></script>
+    <script src="js/bootstrap.bundle.min.js"></script>
 </head>
-
 <body>
     <div class="d-flex" id="wrapper">
         <div class="bg-light border-right" id="sidebar-wrapper">
@@ -30,48 +29,16 @@
 						<br>
 						<h2>Application</h2>
 						<div class="info-grid">
-							<div class="info-row">
-								<div class="info-label">Name:</div>
-								<div class="info-value"><span id="name"></span></div>
-							</div>
-							<div class="info-row">
-								<div class="info-label">Package:</div>
-								<div class="info-value"><span id="package"></span></div>
-							</div>
-							<div class="info-row">
-								<div class="info-label">Version:</div>
-								<div class="info-value"><span id="version"></span></div>
-							</div>
-							<div class="info-row">
-								<div class="info-label">Vendor:</div>
-								<div class="info-value"><span id="vendor"></span></div>
-							</div>
-							<div class="info-row">
-								<div class="info-label">URL:</div>
-								<div class="info-value">
-									<a id="vendorLink" href="" target="_blank"><span id="url"></span></a>
-								</div>
-							</div>
-							<div class="info-row">
-								<div class="info-label">Device:</div>
-								<div class="info-value"><span id="model"></span></div>
-							</div>
-							<div class="info-row">
-								<div class="info-label">Firmware:</div>
-								<div class="info-value"><span id="firmware"></span></div>
-							</div>
-							<div class="info-row">
-								<div class="info-label">Serial:</div>
-								<div class="info-value"><span id="serial"></span></div>
-							</div>
-							<div class="info-row">
-								<div class="info-label">Chip:</div>
-								<div class="info-value"><span id="chip"></span></div>
-							</div>
-							<div class="info-row">
-								<div class="info-label">Architecture:</div>
-								<div class="info-value"><span id="arch"></span></div>
-							</div>
+							<div class="info-row"><div class="info-label">Name:</div><div class="info-value"><span id="name"></span></div></div>
+							<div class="info-row"><div class="info-label">Package:</div><div class="info-value"><span id="package"></span></div></div>
+							<div class="info-row"><div class="info-label">Version:</div><div class="info-value"><span id="version"></span></div></div>
+							<div class="info-row"><div class="info-label">Vendor:</div><div class="info-value"><span id="vendor"></span></div></div>
+							<div class="info-row"><div class="info-label">URL:</div><div class="info-value"><a id="vendorLink" href="" target="_blank"><span id="url"></span></a></div></div>
+							<div class="info-row"><div class="info-label">Device:</div><div class="info-value"><span id="model"></span></div></div>
+							<div class="info-row"><div class="info-label">Firmware:</div><div class="info-value"><span id="firmware"></span></div></div>
+							<div class="info-row"><div class="info-label">Serial:</div><div class="info-value"><span id="serial"></span></div></div>
+							<div class="info-row"><div class="info-label">Chip:</div><div class="info-value"><span id="chip"></span></div></div>
+							<div class="info-row"><div class="info-label">Architecture:</div><div class="info-value"><span id="arch"></span></div></div>
 						</div>
 					</div>
 				</div>
@@ -80,57 +47,38 @@
     </div>
 
 <script>
-
 $(document).ready(function() {
-
 	$.ajax({
 		type: "GET",
-		url: 'app',
-		dataType: 'json',
+		url: "app",
+		dataType: "json",
 		cache: false,
 		success: function(app) {
+			// Fill page title + sidebar
 			document.title = app.manifest.acapPackageConf.setup.friendlyName;
-			$('.sidebar-heading').text(app.manifest.acapPackageConf.setup.friendlyName);
-			$('#name').text(app.manifest.acapPackageConf.setup.friendlyName);
-			$('#package').text(app.manifest.acapPackageConf.setup.appName);
-			$('#version').text(app.manifest.acapPackageConf.setup.version);
-			$('#vendor').text(app.manifest.acapPackageConf.setup.vendor);
-			$('#url').text(app.manifest.acapPackageConf.setup.vendorUrl);
-			$("#vendorLink").attr("href",app.manifest.acapPackageConf.setup.vendorUrl);
+			$(".sidebar-heading").text(app.manifest.acapPackageConf.setup.friendlyName);
+
+			// Fill application info
+			$("#name").text(app.manifest.acapPackageConf.setup.friendlyName);
+			$("#package").text(app.manifest.acapPackageConf.setup.appName);
+			$("#version").text(app.manifest.acapPackageConf.setup.version);
+			$("#vendor").text(app.manifest.acapPackageConf.setup.vendor);
+			$("#url").text(app.manifest.acapPackageConf.setup.vendorUrl);
+			$("#vendorLink").attr("href", app.manifest.acapPackageConf.setup.vendorUrl);
+
+			// Fill device info from "device" section
+			$("#model").text(app.device.model);
+			$("#firmware").text(app.device.firmware);
+			$("#serial").text(app.device.serial);
+			$("#chip").text(app.device.platform);
+			// Use architecture from manifest if present, else from device
+			$("#arch").text(app.manifest.acapPackageConf.setup.architecture || app.device.chip);
 		},
 		error: function(response) {
-			alert(response.statusText);
+			alert("Failed to load: " + response.statusText);
 		}
 	});
-
-	$.ajax({
-		type: "POST",
-		url: '/axis-cgi/basicdeviceinfo.cgi',
-		data:'{"apiVersion": "1.0","context": "acap","method": "getAllProperties"}',
-		contentType: 'application/json',
-		dataType: 'json',
-		cache: false,
-		success: function(basicdeviceinfo) {
-			$('#model').text(basicdeviceinfo.data.propertyList.ProdShortName);
-			$('#firmware').text(basicdeviceinfo.data.propertyList.Version);
-			$('#serial').text(basicdeviceinfo.data.propertyList.SerialNumber);
-			$('#chip').text(basicdeviceinfo.data.propertyList.Soc);
-			$('#arch').text(basicdeviceinfo.data.propertyList.Architecture);
-		},
-		error: function(response) {
-			alert(response.statusText);
-		}
-	});
-
-	// Menu toggle handler
-	$("#menu-toggle").click(function(e) {
-		e.preventDefault();
-		$("#wrapper").toggleClass("toggled");
-	});
-
-
-});	
+});
 </script>
 </body>
-
 </html>

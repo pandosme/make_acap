@@ -2,6 +2,8 @@
 
 ACAP is an open application platform that enables you to develop and deploy applications directly on Axis network devices. This template simplifies development by wrapping complex SDK interactions and offering modular, reusable code for common tasks such as HTTP endpoints, configuration, and event management[1][2][3].
 
+Please provide the content of prompt.md to your prefered LLM (ChatGPT, Claude,...) to get development assistant.
+
 ---
 
 ## Features
@@ -404,17 +406,3 @@ int main(void) {
 
 ---
 
-This README is designed for clarity, completeness, and easy parsing by both human developers and LLM-based assistants. It includes detailed explanations, code snippets, and tables for event topics, ensuring a robust foundation for ACAP development[1][3][4].
-
-Citations:  
-[1] https://github.com/AxisCommunications/acap-native-sdk-examples  
-[2] https://github.com/AxisCommunications/acap3-examples  
-[3] https://github.com/pandosme/make_acap  
-[4] https://github.com/AxisCommunications/acap-native-sdk-examples  
-[5] https://axiscommunications.github.io/acap-documentation/3.5/api/axevent/html/ax__event__key__value__set_8h.html  
-[6] https://axiscommunications.github.io/acap-documentation/3.5/api/axevent/html/ax_event_stateless_declaration_example_8c-example.html  
-[7] https://developer.axis.com/acap/introduction/acap-sdk-overview/  
-[8] https://developer.axis.com/computer-vision/computer-vision-on-device/develop-your-own-deep-learning-application/  
-[9] https://experienceleague.adobe.com/en/docs/experience-platform/assurance/view/event-transactions  
-[10] https://developer.axis.com/vapix/applications/fence-guard/  
-[11] https://www.acapcommunity.org/wp-content/uploads/2023/06/Technical-Notes-Pre-Event-Looping-Slide-Deck-Updated_23Jun2023.pdf  

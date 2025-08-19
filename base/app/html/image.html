@@ -6,8 +6,8 @@
     <title></title>
     <link rel="stylesheet" href="css/bootstrap.min.css">
     <link rel="stylesheet" href="css/app.css">
-    <script src="js/jquery.min.js"></script>
-    <script src="js/bootstrap.min.js"></script>
+    <script src="js/jquery-3.7.1.min.js"></script>
+    <script src="js/bootstrap.bundle.min.js"></script>
 </head>
 <body>
 <div class="d-flex" id="wrapper">
@@ -21,7 +21,6 @@
 			<a href="about.html" class="list-group-item list-group-item-action">About</a>
 		</div>
 	</div>
-
 	<div id="page-content-wrapper" class="p-0">
 		<div class="container-fluid">
 			<div class="col-12">
@@ -30,34 +29,31 @@
 						<h5 class="card-title mb-0">Image</h5>
 					</div>
 					<div class="card-body" id="settings-form">
-						<div class="row mb-3">
-							<div class="col-md-2">
+						<div class="row mb-3 align-items-center g-2">
+							<div class="col-12 col-md-auto mb-2 mb-md-0">
 								<select class="form-control" id="snapshot-resolution"></select>
 							</div>
-							<div class="col-md-2">
+							<div class="col-6 col-md-auto mb-2 mb-md-0">
 								<button id="refresh-snapshot" class="btn btn-primary w-100">Refresh</button>
 							</div>
-							<div class="col-md-2">
+							<div class="col-6 col-md-auto">
 								<button id="capture-snapshot" class="btn btn-primary w-100">Download</button>
 							</div>
 						</div>
 						<div class="image-container" style="height: 480px;">
-							<img src="/axis-cgi/jpg/image.cgi?resolution=640x360" 
-								 alt="Image" 
-								 style="width: 100%; 
-										height: 100%; 
-										object-fit: contain;">
+							<img id="snapshot-img"
+								src=""
+								alt="Image"
+								style="width: 100%; height: 100%; object-fit: contain;">
 						</div>
 					</div>
 				</div>
 			</div>
 		</div>
-
 	</div>
 </div>
 <script>
 $(document).ready(function() {
-	// Main AJAX call
 	$.ajax({
 		type: "GET",
 		url: 'app',
@@ -66,47 +62,60 @@ $(document).ready(function() {
 		success: function(data) {
 			document.title = data.manifest.acapPackageConf.setup.friendlyName;
 			$('.sidebar-heading').text(data.manifest.acapPackageConf.setup.friendlyName);
-
 			const aspectRatio = data.device.aspect || '16:9';
-			const [aspectWidth, aspectHeight] = aspectRatio.split(':').map(Number);
+			const resolutions = data.device.resolutions[aspectRatio] || [];
+			const $select = $('#snapshot-resolution');
 
-			const resolutionSelect = $('#snapshot-resolution');
-			const nativeResolutions = data.device.resolutions[aspectRatio] || [];
-			
-			nativeResolutions.forEach(resolution => {
-				resolutionSelect.append('<option value="' + resolution + '">' + resolution + '</option>');
-			});
+			$select.empty();
+			if(resolutions.length === 0) {
+				$select.append('<option disabled>No resolutions available</option>');
+			} else {
+				resolutions.forEach(function(r) {
+					$select.append('<option value="' + r + '">' + r + '</option>');
+				});
+				// Set initial image to first resolution
+				const initialRes = resolutions[0];
+				loadImage(initialRes);
+			}
 		},
 		error: function(response) {
 			alert('Failed to load device information: ' + response.statusText);
 		}
 	});
-});
-
-
-$('#snapshot-resolution').on('change', function() {
-    const selectedResolution = $(this).val();
-     $('#settings-form img').attr('src', '/axis-cgi/jpg/image.cgi?resolution=' + selectedResolution);
-});
-
-$('#refresh-snapshot').on('click', function() {
-	window.location.reload();
-});
-
-// Snapshot capture functionality
-$('#capture-snapshot').on('click', function() {
-	const selectedResolution = $('#snapshot-resolution').val();
-	const [width, height] = selectedResolution.split('x');
 	
-	// Trigger snapshot download
-	const downloadLink = document.createElement('a');
-	downloadLink.href = 'capture?width=' + width + '&height=' + height;
-	downloadLink.download = `snapshot_${selectedResolution}.jpeg`;
-	document.body.appendChild(downloadLink);
-	downloadLink.click();
-	document.body.removeChild(downloadLink);
-});
+	// Event handler for resolution change
+	$('#snapshot-resolution').on('change', function() {
+		const selectedResolution = $(this).val();
+		loadImage(selectedResolution);
+	});
 
+	// Just reload image, not page!
+	$('#refresh-snapshot').on('click', function() {
+		const selectedResolution = $('#snapshot-resolution').val();
+		loadImage(selectedResolution);
+	});
+
+	// Snapshot capture functionality
+	$('#capture-snapshot').on('click', function() {
+		const selectedResolution = $('#snapshot-resolution').val();
+		if(!selectedResolution) return;
+		const [width, height] = selectedResolution.split('x');
+		const link = document.createElement('a');
+		link.href = 'capture?width=' + width + '&height=' + height;
+		link.download = `snapshot_${selectedResolution}.jpeg`;
+		document.body.appendChild(link);
+		link.click();
+		document.body.removeChild(link);
+	});
+
+	function loadImage(resolution) {
+		if(!resolution) return;
+		// Add cache-buster so browser always loads!
+		const ts = Date.now();
+		const url = '/axis-cgi/jpg/image.cgi?resolution=' + resolution + '&t=' + ts;
+		$('#snapshot-img').attr('src', url);
+	}
+});
 </script>
 </body>
 </html>

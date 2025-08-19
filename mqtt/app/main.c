@@ -70,30 +70,47 @@ HTTP_ENDPOINT_Publish(ACAP_HTTP_Response response,const ACAP_HTTP_Request reques
 		ACAP_HTTP_Respond_Error(response, 500, "Message publish failed");
 }
 
-void 
-MQTT_Status_Callback (int state) {
-	switch( state ) {
-		case MQTT_CONNECT:
-			LOG_TRACE("%s: Connect\n",__func__);
-			char topic[64];
-			sprintf(topic,"connect/%s",ACAP_DEVICE_Prop("serial"));
-			cJSON* connection = cJSON_CreateObject();
-			cJSON_AddTrueToObject(connection,"connected");
-			cJSON_AddStringToObject(connection,"address",ACAP_DEVICE_Prop("IPv4"));
-			MQTT_Publish_JSON(topic,connection,0,1);
-			break;
-		case MQTT_RECONNECT:
-			LOG("%s: Reconnect\n",__func__);
-			break;
-		case MQTT_DISCONNECT:
-			LOG("%s: Disconnect\n",__func__);
-			break;
-	}
+void
+Main_MQTT_Status(int state) {
+    char topic[64];
+    cJSON* message = 0;
+
+    switch (state) {
+        case MQTT_INITIALIZING:
+            LOG("%s: Initializing\n", __func__);
+            break;
+        case MQTT_CONNECTING:
+            LOG("%s: Connecting\n", __func__);
+            break;
+        case MQTT_CONNECTED:
+            LOG("%s: Connected\n", __func__);
+            sprintf(topic, "connect/%s", ACAP_DEVICE_Prop("serial"));
+            message = cJSON_CreateObject();
+            cJSON_AddTrueToObject(message, "connected");
+            cJSON_AddStringToObject(message, "address", ACAP_DEVICE_Prop("IPv4"));
+            MQTT_Publish_JSON(topic, message, 0, 1);
+            cJSON_Delete(message);
+            break;
+        case MQTT_DISCONNECTING:
+            sprintf(topic, "connect/%s", ACAP_DEVICE_Prop("serial"));
+            message = cJSON_CreateObject();
+            cJSON_AddFalseToObject(message, "connected");
+            cJSON_AddStringToObject(message, "address", ACAP_DEVICE_Prop("IPv4"));
+            MQTT_Publish_JSON(topic, message, 0, 1);
+            cJSON_Delete(message);
+            break;
+        case MQTT_RECONNECTED:
+            LOG("%s: Reconnected\n", __func__);
+            break;
+        case MQTT_DISCONNECTED:
+            LOG("%s: Disconnect\n", __func__);
+            break;
+    }
 }
 
 void
-Subscription(const char *topic, const char *payload) {
-	LOG("Subscription: %s %s\n",topic,payload);
+Main_MQTT_Subscription_Message(const char *topic, const char *payload) {
+    LOG("Message arrived: %s %s\n", topic, payload);
 }
 
 
@@ -116,8 +133,8 @@ main(void) {
 	ACAP( APP_PACKAGE, Settings_Updated_Callback );
 	ACAP_HTTP_Node("publish", HTTP_ENDPOINT_Publish );
 
-	MQTT_Init( APP_PACKAGE, MQTT_Status_Callback );
-	MQTT_Subscribe( "mqtt", Subscription );
+    MQTT_Init(Main_MQTT_Status, Main_MQTT_Subscription_Message);
+	MQTT_Subscribe( "my_topic" );
 	
 	main_loop = g_main_loop_new(NULL, FALSE);
     GSource *signal_source = g_unix_signal_source_new(SIGTERM);
@@ -130,8 +147,9 @@ main(void) {
 
 	g_main_loop_run(main_loop);
 	LOG("Terminating and cleaning up %s\n",APP_PACKAGE);
+    Main_MQTT_Status(MQTT_DISCONNECTING);
+    MQTT_Cleanup();
 	ACAP_Cleanup();
-	MQTT_Cleanup();
 	
     return 0;
 }

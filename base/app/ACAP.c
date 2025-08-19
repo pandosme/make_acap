@@ -1,7 +1,8 @@
 /*
+ * ACAP SDK wrapper for verion ACAP SDK 12.x
  * Copyright (c) 2025 Fred Juhlin
  * MIT License - See LICENSE file for details
- * Version 3.6
+ * Version 4.0
  */
 
 #include <stdio.h>
@@ -153,12 +154,13 @@ static void
 ACAP_ENDPOINT_app(const ACAP_HTTP_Response response, const ACAP_HTTP_Request request) {
     // Check request method
     const char* method = ACAP_HTTP_Get_Method(request);
-    
+
     if (method && strcmp(method, "POST") == 0) {
         // Return 405 Method Not Allowed for POST requests
         ACAP_HTTP_Respond_Error(response, 405, "Method Not Allowed - Use GET");
         return;
     }
+	
     ACAP_HTTP_Respond_JSON(response, app);
 }
 
@@ -206,8 +208,9 @@ ACAP_ENDPOINT_settings(const ACAP_HTTP_Response response, const ACAP_HTTP_Reques
         cJSON* param = params->child;
         while (param) {
             if (cJSON_GetObjectItem(settings, param->string)) {
-                cJSON_ReplaceItemInObject(settings, param->string, 
-                                        cJSON_Duplicate(param, 1));
+                cJSON_ReplaceItemInObject(settings, param->string, cJSON_Duplicate(param, 1));
+				if (ACAP_UpdateCallback)
+					ACAP_UpdateCallback(param->string, cJSON_GetObjectItem(settings,param->string) );
             }
             param = param->next;
         }
@@ -398,6 +401,8 @@ int ACAP_HTTP_Node(const char *nodename, ACAP_HTTP_Callback callback) {
     return 1;
 }
 
+
+
 void ACAP_HTTP_Process() {
 	FCGX_Request request;
     ACAP_HTTP_Request_DATA requestData = {0};
@@ -496,6 +501,34 @@ cleanup:
  * HTTP Request Parameter Handling Implementation
  *------------------------------------------------------------------*/
 
+char* url_decode(const char* src) {
+    size_t src_len = strlen(src);
+    char* decoded = malloc(src_len + 1);
+    if (!decoded) return NULL;
+
+    size_t i, j = 0;
+    for (i = 0; i < src_len; i++) {
+        if (src[i] == '%' && i + 2 < src_len) {
+            int high = tolower(src[i + 1]);
+            int low = tolower(src[i + 2]);
+            if (isxdigit(high) && isxdigit(low)) {
+                decoded[j++] = (high >= 'a' ? high - 'a' + 10 : high - '0') * 16 +
+                               (low >= 'a' ? low - 'a' + 10 : low - '0');
+                i += 2;
+            } else {
+                decoded[j++] = src[i];
+            }
+        } else if (src[i] == '+') {
+            decoded[j++] = ' ';
+        } else {
+            decoded[j++] = src[i];
+        }
+    }
+    decoded[j] = '\0';
+    return decoded;
+}
+
+
 const char* ACAP_HTTP_Request_Param(const ACAP_HTTP_Request request, const char* name) {
     if (!request || !request->request || !name) {
         LOG_WARN("Invalid request parameters\n");
@@ -515,15 +548,15 @@ const char* ACAP_HTTP_Request_Param(const ACAP_HTTP_Request request, const char*
                 char* end = strchr(found, '&');
                 size_t len = end ? (size_t)(end - found) : strlen(found);
                 
-                // Allocate memory for the result
-                char* result = (char*)malloc(len + 1);
-                if (!result) {
-                    return NULL;
-                }
+                char* encoded = malloc(len + 1);
+                if (!encoded) return NULL;
                 
-                strncpy(result, found, len);
-                result[len] = '\0';
-                return result;  // Caller must free this
+                strncpy(encoded, found, len);
+                encoded[len] = '\0';
+                
+                char* decoded = url_decode(encoded);
+                free(encoded);
+                return decoded;  // Caller must free this
             }
         }
     }
@@ -536,7 +569,6 @@ const char* ACAP_HTTP_Request_Param(const ACAP_HTTP_Request request, const char*
         
         const char* start = query_string;
         while ((start = strstr(start, search_param)) != NULL) {
-            // Make sure we found the parameter at the start of the string or after an &
             if (start != query_string && *(start-1) != '&') {
                 start++;
                 continue;
@@ -546,21 +578,20 @@ const char* ACAP_HTTP_Request_Param(const ACAP_HTTP_Request request, const char*
             char* end = strchr(start, '&');
             size_t len = end ? (size_t)(end - start) : strlen(start);
             
-            // Allocate memory for the result
-            char* result = (char*)malloc(len + 1);
-            if (!result) {
-                return NULL;
-            }
+            char* encoded = malloc(len + 1);
+            if (!encoded) return NULL;
             
-            strncpy(result, start, len);
-            result[len] = '\0';
-            return result;  // Caller must free this
+            strncpy(encoded, start, len);
+            encoded[len] = '\0';
+            
+            char* decoded = url_decode(encoded);
+            free(encoded);
+            return decoded;  // Caller must free this
         }
     }
 
     return NULL;
 }
-
 
 /*------------------------------------------------------------------
  * HTTP Response Implementation
@@ -611,6 +642,7 @@ int ACAP_HTTP_Respond_String(ACAP_HTTP_Response response, const char *fmt, ...) 
     va_end(args);
     
     if (written < 0 || written >= (int)sizeof(buffer)) {
+		LOG_WARN("%s: Response failed\n",__func__);
         return 0;
     }
     
@@ -619,19 +651,18 @@ int ACAP_HTTP_Respond_String(ACAP_HTTP_Response response, const char *fmt, ...) 
 
 int ACAP_HTTP_Respond_JSON(ACAP_HTTP_Response response, cJSON* object) {
     if (!response || !object) {
-        LOG_WARN("Invalid response handle or JSON object\n");
         return 0;
     }
 
     char* jsonString = cJSON_PrintUnformatted(object);
     if (!jsonString) {
-        LOG_WARN("Failed to serialize JSON\n");
-		ACAP_HTTP_Respond_Error(response, 500, "Failed to serialize JSON");
         return 0;
     }
-
-    int result = ACAP_HTTP_Header_JSON(response) &&
-                 ACAP_HTTP_Respond_String(response, "%s", jsonString);
+    
+    ACAP_HTTP_Header_JSON(response);
+    
+    size_t json_len = strlen(jsonString);
+    int result = FCGX_PutStr(jsonString, json_len, response->out) == (int)json_len;
     
     free(jsonString);
     return result;
@@ -1226,8 +1257,24 @@ cJSON* ACAP_DEVICE(void) {
 		cJSON_AddStringToObject(ACAP_DEVICE_Container,"firmware","0.0.0");
 	if( apiData )
 		cJSON_Delete(apiData);
+	apiData = 0;
 	if( response )
 		free(response);
+
+	//Get IP address
+	response = ACAP_VAPIX_Get("param.cgi?action=list&group=root.Network.eth0.IPAddress");
+	if( response ) {
+		items = SplitString( response, "=" );
+		if( items && cJSON_GetArraySize(items) == 2 )
+			cJSON_AddStringToObject(ACAP_DEVICE_Container,"IPv4",cJSON_GetArrayItem(items,1)->valuestring);
+		else
+			cJSON_AddStringToObject(ACAP_DEVICE_Container,"IPv4","");
+		free(response);
+	} else {
+		cJSON_AddStringToObject(ACAP_DEVICE_Container,"IPv4","");
+	}
+	if( items )
+		cJSON_Delete(items);
 
 	cJSON_AddItemToObject(ACAP_DEVICE_Container,"location",GetLocationData());
 	
