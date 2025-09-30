@@ -57,10 +57,16 @@
 	<div class="bg-light border-right" id="sidebar-wrapper">
         <div class="sidebar-heading">&nbsp;</div>
 		<div class="list-group list-group-flush">
-			<a href="index.html" class="list-group-item list-group-item-action">Video</a>
-			<a href="mqtt.html" class="list-group-item list-group-item-action active">MQTT</a>
-			<a href="test.html" class="list-group-item list-group-item-action">Test</a>
-			<a href="about.html" class="list-group-item list-group-item-action">About</a>
+				<a href="index.html" class="list-group-item list-group-item-action">Publish</a>
+				<a href="events.html" class="list-group-item list-group-item-action">Events</a>
+				<a href="detections.html" class="list-group-item list-group-item-action">Detections</a>
+				<a href="trackers.html" class="list-group-item list-group-item-action">Trackers</a>
+				<a href="paths.html" class="list-group-item list-group-item-action">Paths</a>
+				<a href="occupancy.html" class="list-group-item list-group-item-action">Occupancy</a>
+				<a href="anomaly.html" class="list-group-item list-group-item-action">Anomaly</a>
+				<a href="geospace.html" class="list-group-item list-group-item-action">Geospace</a>
+				<a href="mqtt.html" class="list-group-item list-group-item-action active">MQTT Settings</a>
+				<a href="about.html" class="list-group-item list-group-item-action">About</a>
 		</div>
 	</div>
 	
@@ -227,10 +233,11 @@ function CheckStatus() {
 $("#saveCert").click(function() {
     var data = $('#cert').val();
     if (!validateCertificate(data)) return;
-    var jsonData = JSON.stringify({type: "cert",pem: data});
+    var payload = {type: "cert",pem: data};
     $.ajax({
-        type: "GET",
-        url: "certs?json=" + encodeURI(jsonData),
+        type: "POST",
+        url: "certs",
+        data: JSON.stringify(payload),  
         contentType: 'application/json',
         success: function(response) {
             $('#certModal').modal('hide');
@@ -258,9 +265,10 @@ $("#saveKey").click(function() {
     }
     
     $.ajax({
-        type: "GET",
-        url: "certs?json=" + encodeURI(JSON.stringify(payload)),
+        type: "POST",
+        url: "certs",
         contentType: 'application/json',
+        data: JSON.stringify(payload),  
         success: function(response) {
             $('#keyModal').modal('hide');
             CheckStatus();
@@ -274,9 +282,11 @@ $("#saveKey").click(function() {
 $("#saveCA").click(function() {
     var data = $('#ca').val();
     if (!validateCertificate(data)) return;
+    var payload = { type: "ca", pem: data };
     $.ajax({
-        type: "GET",
-        url: "certs?type=ca&pem=" + encodeURI(data),
+        type: "POST",                   
+        url: "certs",                   
+        data: JSON.stringify(payload),  
         contentType: 'application/json',
         success: function(response) {
             $('#caModal').modal('hide');

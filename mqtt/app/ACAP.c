@@ -2,7 +2,8 @@
  * ACAP SDK wrapper for verion ACAP SDK 12.x
  * Copyright (c) 2025 Fred Juhlin
  * MIT License - See LICENSE file for details
- * Version 4.0
+ * Version 4.1
+   - Copy all saved setting into settings includin objects
  */
 
 #include <stdio.h>
@@ -103,19 +104,8 @@ cJSON* ACAP(const char* package, ACAP_Config_Update callback) {
     if (savedSettings) {
         cJSON* prop = savedSettings->child;
         while (prop) {
-            if (cJSON_GetObjectItem(settings, prop->string)) {
-  				if( prop->type == cJSON_Object ) {
-					cJSON* settingsProp = cJSON_GetObjectItem(settings,prop->string);
-					cJSON* subprop = prop->child;
-					while( subprop ) {
-						if( cJSON_GetObjectItem( settingsProp, subprop->string ) )
-							cJSON_ReplaceItemInObject(settingsProp, subprop->string, cJSON_Duplicate(subprop, 1));
-						subprop = subprop->next;
-					}
-				} else {
-					cJSON_ReplaceItemInObject(settings, prop->string, cJSON_Duplicate(prop, 1));
-				}
-            }
+            if (cJSON_GetObjectItem(settings, prop->string))
+				cJSON_ReplaceItemInObject(settings, prop->string, cJSON_Duplicate(prop, 1));
             prop = prop->next;
         }
         cJSON_Delete(savedSettings);
@@ -1771,6 +1761,10 @@ ACAP_EVENTS_Parse( AXEvent *axEvent ) {
 	}
 
 	//Special Device Event Filter
+	if( strcmp(topic,"Device/Configuration") == 0 ) {
+		cJSON_Delete(object);
+		return 0;
+	}
 	if( strcmp(topic,"Device/IO/Port") == 0 ) {
 		int port = cJSON_GetObjectItem(object,"port")?cJSON_GetObjectItem(object,"port")->valueint:-1;
 		if( port == -1 ) {
