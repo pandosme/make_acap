@@ -81,17 +81,20 @@ CERTS_Get_Password() {
 
 void
 CERTS_HTTP (const  ACAP_HTTP_Response response,const  ACAP_HTTP_Request request) {
-	LOG_TRACE("%s: Entry\n",__func__);
+    LOG_TRACE("%s: Entry\n", __func__);
 
-	if( !CERTS_SETTINGS ) {
-		LOG_WARN("CERTS is not initiailiaized\n");
-		 ACAP_HTTP_Respond_Error( response, 400, "Certificate service is not initializied" );
-		return ;
-	}
+    // Check if service is initialized
+    if (!CERTS_SETTINGS) {
+        LOG_WARN("CERTS: Not initialized\n");
+        ACAP_HTTP_Respond_Error(response, 400, "Certificate service is not initialized");
+        return;
+    }
 
-	const char *jsonData =  ACAP_HTTP_Request_Param( request, "json");
-	if(!jsonData) {
-		LOG_TRACE("%s: No action.  Respond with data\n", __func__);
+    // Determine request method
+    const char *method = ACAP_HTTP_Get_Method(request);
+    const char *contentType = ACAP_HTTP_Get_Content_Type(request);
+
+	if( !method || strcmp(method,"GET") == 0 ) {
 		cJSON* copy = cJSON_Duplicate( CERTS_SETTINGS,1 );
 		if( cJSON_GetObjectItem( copy,"password") ) {
 			cJSON_ReplaceItemInObject( copy,"password",cJSON_CreateString("") );
@@ -100,8 +103,31 @@ CERTS_HTTP (const  ACAP_HTTP_Response response,const  ACAP_HTTP_Request request)
 		 cJSON_Delete(copy);
 		 return;
 	}
-	
-	cJSON* data = cJSON_Parse( jsonData );
+
+    // If POST and JSON, parse request->postData
+    cJSON *data = NULL;
+    if (method && strcmp(method, "POST") == 0 && contentType &&
+        strstr(contentType, "application/json")) {
+        if (request->postData && request->postDataLength > 0) {
+            // Parse POST body as JSON
+            data = cJSON_Parse(request->postData);
+            if (!data) {
+                ACAP_HTTP_Respond_Error(response, 400, "JSON Parse error");
+                return;
+            }
+        }
+    } else {
+        // For legacy GET with ?json=..., fall back to query string
+        const char *jsonData = ACAP_HTTP_Request_Param(request, "json");
+        if (jsonData) {
+            data = cJSON_Parse(jsonData);
+            if (!data) {
+                ACAP_HTTP_Respond_Error(response, 400, "JSON Parse error");
+                return;
+            }
+        }
+    }
+
 	if(!data) {
 		ACAP_HTTP_Respond_Error( response, 400, "JSON Parse error" );
 		return;
@@ -220,6 +246,7 @@ CERTS_HTTP (const  ACAP_HTTP_Response response,const  ACAP_HTTP_Request request)
 	}
 	char fullpath[256]="";
 	sprintf(fullpath,"%s%s", ACAP_FILE_AppPath(),filepath);
+	LOG_TRACE("%s: %s",type,fullpath);
 	if( strcmp(type,"cert") == 0 ) {
 		if( cJSON_GetObjectItem(CERTS_SETTINGS,"certfile") )
 			cJSON_ReplaceItemInObject(CERTS_SETTINGS,"certfile",cJSON_CreateString(fullpath));
