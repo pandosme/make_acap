@@ -36,10 +36,10 @@ app/
   ├── ACAP.c / ACAP.h          # ACAP API wrapper (do not edit)
   ├── main.c                   # Application logic (edit here)
   ├── cJSON.c / cJSON.h        # JSON helper
-  ├── settings/
-  │     ├── settings.json      # User/config parameters
+  ├── /
+  │     ├── .json      # User/config parameters
   │     ├── events.json        # Device event declarations (if needed)
-  │     ├── mqtt.json          # MQTT client settings (if needed)
+  │     ├── mqtt.json          # MQTT client  (if needed)
   │     └── subscriptions.json # Device event subscriptions (if needed)
   ├── html/
   │     └── index.html         # (Optional) web UI
@@ -77,13 +77,13 @@ build.sh                       # Helper: builds and packages for upload
 ***
 
 **manifest.json**
-- **Purpose:** Declares app identity, endpoints, settings page, permissions.
+- **Purpose:** Declares app identity, endpoints,  page, permissions.
 - **How/when to edit:**
   - **Add endpoints** in the `"httpConfig"` array for each API you want accessible:
     ```json
     "httpConfig": [
       {"name": "app", "access": "admin", "type": "fastCgi"},
-      {"name": "settings", "access": "admin", "type": "fastCgi"},
+      {"name": "", "access": "admin", "type": "fastCgi"},
       {"name": "capture", "access": "admin", "type": "fastCgi"},
       {"name": "publish", "access": "admin", "type": "fastCgi"}
     ]
@@ -109,9 +109,9 @@ build.sh                       # Helper: builds and packages for upload
 
 - Always call `ACAP(, callback)` during startup!
 - Register HTTP endpoints with `ACAP_HTTP_Node("endpoint", handler_fn)`.
-- Built-in endpoints: `/local//app` (metadata), `/local//settings` (config).
+- Built-in endpoints: `/local//app` (metadata), `/local//` (config).
 - Main helper functions:
-  - Settings: `ACAP`, `ACAP_FILE_Read`, `ACAP_FILE_Write`
+  - : `ACAP`, `ACAP_FILE_Read`, `ACAP_FILE_Write`
   - Events: `ACAP_EVENTS_Add_Event`, `ACAP_EVENTS_Fire`, `ACAP_EVENTS_Fire_State`, `ACAP_EVENTS_SetCallback`, `ACAP_EVENTS_Subscribe`
   - Status: `ACAP_STATUS_SetBool`, `ACAP_STATUS_SetNumber`, `ACAP_STATUS_SetString`, `ACAP_STATUS_SetObject`, `ACAP_STATUS_SetNull`
 ***
@@ -154,6 +154,34 @@ Edit this file to expose any app settings that should be user-editable (handled 
   "age": 50
 }
 ```
+
+- To get your app’s current configuration, always use:
+  ```c
+  cJSON* settings = ACAP_Get_Config("settings");
+  ```
+- **Do NOT read config files directly** (i.e., don’t use `ACAP_FILE_Read("settings/settings.json")` to fetch live settings).
+- The ACAP SDK manages settings in memory, ensures atomic updates, and provides thread safety through `ACAP_Get_Config`.
+- **Never manually delete or free** the returned `settings` pointer. It is handled by the SDK!
+
+***
+
+### **Example: Using Settings in an Event Callback**
+
+```c
+void
+My_Event_Callback(cJSON *event, void* userdata) {
+    // Get app settings safely
+    cJSON* settings = ACAP_Get_Config("settings");
+    const char* name = cJSON_GetObjectItem(settings,"name")?cJSON_GetObjectItem(settings,"name")->valuestring:0;
+    int age = cJSON_GetObjectItem(settings,"age")?cJSON_GetObjectItem(settings,"age")->valueint:0;
+
+    // Proceed with rest of logic using base_url...
+}
+```
+
+- **Fetch settings with**: `ACAP_Get_Config("settings")`
+- **Do NOT**: Read config file directly
+- **Do NOT**: Free/delete settings object
 
 ***
 
@@ -339,4 +367,5 @@ int main(void) {
 > **What do you want your camera app to do?**
 
 ***
+
 
