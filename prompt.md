@@ -154,8 +154,8 @@ Edit this file to expose any app settings that should be user-editable (handled 
   "age": 50
 }
 ```
-
-- To get your app’s current configuration, always use:
+The ACAP-wrapper manages the GET and POST for settings.
+To get your app’s current configuration, always use:
   ```c
   cJSON* settings = ACAP_Get_Config("settings");
   ```
@@ -178,6 +178,8 @@ My_Event_Callback(cJSON *event, void* userdata) {
     // Proceed with rest of logic using base_url...
 }
 ```
+
+The default settings are stored in settings/settings.json.  Updated and modified settings are store in localdata/settings.json
 
 ***
 
@@ -403,6 +405,7 @@ int main(void) {
 > **What do you want your camera app to do?**
 
 ***
+
 
 
 
