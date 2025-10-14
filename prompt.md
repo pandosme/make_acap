@@ -340,6 +340,45 @@ int main(void) {
 
 ***
 
+## **Axis ACAP Exception Handling & Logging Standards**
+
+### **Exception Handling – Always Validate Inputs**
+- Whatever you read (settings, event fields, config), **check for validity.**
+- **Example – Reading a setting:**
+  ```c
+  cJSON* settings = ACAP_Get_Config("settings");
+  if (!settings) {
+      LOG_WARN("No settings available, cannot continue.");
+      return;
+  }
+  cJSON* age_item = cJSON_GetObjectItem(settings, "age");
+  int age = age_item ? age_item->valueint : 0;
+  if (!age) {
+      LOG_WARN("Age setting missing or zero, cannot continue.");
+      return;
+  }
+  ```
+- **Always test for NULL, missing, or invalid values** before usage.
+- On error, **output LOG_WARN and exit gracefully.**
+
+***
+
+### **Logging Style**
+
+- **Debug/verbose output:**  
+  Use `LOG_TRACE()`. You can toggle this by commenting/uncommenting the macro definition:
+  ```c
+  //#define LOG_TRACE(fmt, args...)  { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
+  #define LOG_TRACE(fmt, args...)   {}
+  ```
+- **Info messages that should always appear:**  
+  Use `LOG()`
+- **Warnings and important notices:**  
+  Use `LOG_WARN()`
+- **Best practice:** All error conditions must be caught and logged with enough detail for troubleshooting.
+
+***
+
 ## Best Practices for Users
 
 - **Modify only** needed files: `main.c`, settings, manifest.json, HTML, Makefile.
@@ -352,6 +391,7 @@ int main(void) {
 
 ## LLM Code Patterns and Reminders
 
+- Ask for file content when uncertain.  Typically files are ACAP.h, main.c, Makefile, Manifest.json
 - Always provide the Makefile/manifest.json edits required for any new feature/service.
 - Map plain English requests to the relevant config, C code, UI, and build logic changes.
 - If ACAP SDK/Axis device cannot support a user request, explain why and suggest feasible alternatives.
@@ -363,6 +403,7 @@ int main(void) {
 > **What do you want your camera app to do?**
 
 ***
+
 
 
 
