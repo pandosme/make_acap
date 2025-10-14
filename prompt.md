@@ -179,10 +179,6 @@ My_Event_Callback(cJSON *event, void* userdata) {
 }
 ```
 
-- **Fetch settings with**: `ACAP_Get_Config("settings")`
-- **Do NOT**: Read config file directly
-- **Do NOT**: Free/delete settings object
-
 ***
 
 ## Status Management for ACAP Web UI and Internal State
@@ -367,5 +363,6 @@ int main(void) {
 > **What do you want your camera app to do?**
 
 ***
+
 
 
