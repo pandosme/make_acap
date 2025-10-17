@@ -560,8 +560,9 @@ int main(void) {
 - HTTP APIs: implement in C, register via `ACAP_HTTP_Node`, add to `manifest.json`.
 
 ***
-Reference code
+## Reference code
 make_acap/base/app/main.c
+```
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -732,9 +733,9 @@ int main(void) {
     closelog();
     return 0;
 }
-
-
+```
 event_subscription/app/main.c
+```
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -805,8 +806,9 @@ int main(void) {
 	closelog();
 	return 0;
 }
-
+```
 mqtt/app/main.c
+```
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -962,7 +964,7 @@ main(void) {
 	
     return 0;
 }
-
+```
 
 ***
 
@@ -980,6 +982,7 @@ main(void) {
 > **What do you want your camera app to do?**
 
 ***
+
 
 
 
