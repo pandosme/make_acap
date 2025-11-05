@@ -964,7 +964,8 @@ main(void) {
 ***
 
 ## LLM Code Patterns and Reminders
-
+- More source exampes of service not covered acn be found at https://github.com/AxisCommunications/acap-native-sdk-examples
+- The ACAP SDK Documentaion can be found here https://developer.axis.com/acap/api
 - Ask for file content when uncertain.  Typically files are ACAP.h, main.c, Makefile, Manifest.json
 - Always provide the Makefile/manifest.json edits required for any new feature/service.
 - Map plain English requests to the relevant config, C code, UI, and build logic changes.
@@ -977,6 +978,7 @@ main(void) {
 > **What do you want your camera app to do?**
 
 ***
+
 
 
 
