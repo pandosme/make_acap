@@ -2,8 +2,7 @@
  * ACAP SDK wrapper for verion ACAP SDK 12.x
  * Copyright (c) 2025 Fred Juhlin
  * MIT License - See LICENSE file for details
- * Version 4.1
-   - Copy all saved setting into settings includin objects
+ * Version 4.0
  */
 
 #include <stdio.h>
@@ -104,8 +103,19 @@ cJSON* ACAP(const char* package, ACAP_Config_Update callback) {
     if (savedSettings) {
         cJSON* prop = savedSettings->child;
         while (prop) {
-            if (cJSON_GetObjectItem(settings, prop->string))
-				cJSON_ReplaceItemInObject(settings, prop->string, cJSON_Duplicate(prop, 1));
+            if (cJSON_GetObjectItem(settings, prop->string)) {
+  				if( prop->type == cJSON_Object ) {
+					cJSON* settingsProp = cJSON_GetObjectItem(settings,prop->string);
+					cJSON* subprop = prop->child;
+					while( subprop ) {
+						if( cJSON_GetObjectItem( settingsProp, subprop->string ) )
+							cJSON_ReplaceItemInObject(settingsProp, subprop->string, cJSON_Duplicate(subprop, 1));
+						subprop = subprop->next;
+					}
+				} else {
+					cJSON_ReplaceItemInObject(settings, prop->string, cJSON_Duplicate(prop, 1));
+				}
+            }
             prop = prop->next;
         }
         cJSON_Delete(savedSettings);
@@ -944,8 +954,10 @@ ACAP_DEVICE_Network_Average() {
 	}
   
 	while( fgets(readstr,500,fd) ) {
-		if( strstr( readstr,"eth0") != 0 )
-			strcpy( data, readstr );
+		if( strstr( readstr,"eth0") != 0 ) {
+			strncpy( data, readstr, sizeof(data) - 1 );
+			data[sizeof(data) - 1] = '\0';  // Ensure null termination
+		}
 	}
 	fclose(fd);
   
@@ -1119,9 +1131,21 @@ cJSON* GetLocationData() {
     return locationData;
 }
 
-void AppendQueryParameter(char* query, const char* key, const char* value) {
+void AppendQueryParameter(char* query, size_t query_size, const char* key, const char* value) {
     // If the query string is not empty, add an '&' separator
-    if (strlen(query) > 0) {
+    size_t current_len = strlen(query);
+    size_t needed_len = current_len + strlen(key) + strlen(value) + 2; // +2 for '=' and potentially '&'
+
+    if (current_len > 0) {
+        needed_len++; // Account for '&'
+    }
+
+    if (needed_len >= query_size) {
+        LOG_WARN("AppendQueryParameter: Buffer overflow prevented. Needed %zu, have %zu", needed_len, query_size);
+        return;
+    }
+
+    if (current_len > 0) {
         strcat(query, "&");
     }
     // Append the key=value pair to the query string
@@ -1155,21 +1179,21 @@ int SetLocationData(cJSON* location) {
     if (lat && lon && !cJSON_IsNull(lat) && !cJSON_IsNull(lon)) {
         // Format latitude and longitude according to the API requirements
         FormatCoordinates(lat->valuedouble, lon->valuedouble, latBuffer, sizeof(latBuffer), lonBuffer, sizeof(lonBuffer));
-        AppendQueryParameter(query, "lat", latBuffer);
-        AppendQueryParameter(query, "lng", lonBuffer);
+        AppendQueryParameter(query, sizeof(query), "lat", latBuffer);
+        AppendQueryParameter(query, sizeof(query), "lng", lonBuffer);
     }
 
     // Check and append "heading" if present
     cJSON* heading = cJSON_GetObjectItem(location, "heading");
     if (heading && !cJSON_IsNull(heading)) {
         snprintf(valueBuffer, sizeof(valueBuffer), "%d", heading->valueint);
-        AppendQueryParameter(query, "heading", valueBuffer);
+        AppendQueryParameter(query, sizeof(query), "heading", valueBuffer);
     }
 
     // Check and append "text" if present
     cJSON* text = cJSON_GetObjectItem(location, "text");
     if (text && !cJSON_IsNull(text)) {
-        AppendQueryParameter(query, "text", text->valuestring);
+        AppendQueryParameter(query, sizeof(query), "text", text->valuestring);
     }
 
     // If no parameters were added, return an error
@@ -1390,7 +1414,7 @@ const char*
 ACAP_DEVICE_Date() {
 	time_t t = time(NULL);
 	struct tm *tm = localtime(&t);
-	sprintf(ACAP_DEVICE_date,"%d-%02d-%02d",tm->tm_year + 1900,tm->tm_mon + 1, tm->tm_mday);
+	snprintf(ACAP_DEVICE_date, sizeof(ACAP_DEVICE_date), "%d-%02d-%02d",tm->tm_year + 1900,tm->tm_mon + 1, tm->tm_mday);
 	return ACAP_DEVICE_date;
 }
 
@@ -1398,7 +1422,7 @@ const char*
 ACAP_DEVICE_Time() {
 	time_t t = time(NULL);
 	struct tm *tm = localtime(&t);
-	sprintf(ACAP_DEVICE_time,"%02d:%02d:%02d",tm->tm_hour,tm->tm_min,tm->tm_sec);
+	snprintf(ACAP_DEVICE_time, sizeof(ACAP_DEVICE_time), "%02d:%02d:%02d",tm->tm_hour,tm->tm_min,tm->tm_sec);
 	return ACAP_DEVICE_time;
 }
 
@@ -1407,7 +1431,7 @@ const char*
 ACAP_DEVICE_Local_Time() {
 	time_t t = time(NULL);
 	struct tm *tm = localtime(&t);
-	sprintf(ACAP_DEVICE_timestring,"%d-%02d-%02d %02d:%02d:%02d",tm->tm_year + 1900,tm->tm_mon + 1, tm->tm_mday,tm->tm_hour,tm->tm_min,tm->tm_sec);
+	snprintf(ACAP_DEVICE_timestring, sizeof(ACAP_DEVICE_timestring), "%d-%02d-%02d %02d:%02d:%02d",tm->tm_year + 1900,tm->tm_mon + 1, tm->tm_mday,tm->tm_hour,tm->tm_min,tm->tm_sec);
 	LOG_TRACE("Local Time: %s\n",ACAP_DEVICE_timestring);
 	return ACAP_DEVICE_timestring;
 }
@@ -1632,8 +1656,14 @@ ACAP_EVENTS() {
 	cJSON* setup = cJSON_GetObjectItem(acapPackageConf,"setup");
 	if(!setup)
 		return cJSON_CreateNull();
-	sprintf(ACAP_EVENTS_PACKAGE,"%s", cJSON_GetObjectItem(setup,"appName")->valuestring);
-	sprintf(ACAP_EVENTS_APPNAME,"%s", cJSON_GetObjectItem(setup,"friendlyName")->valuestring);
+	cJSON* appName = cJSON_GetObjectItem(setup,"appName");
+	cJSON* friendlyName = cJSON_GetObjectItem(setup,"friendlyName");
+	if(!appName || !appName->valuestring || !friendlyName || !friendlyName->valuestring) {
+		LOG_WARN("Missing appName or friendlyName in manifest setup");
+		return cJSON_CreateNull();
+	}
+	snprintf(ACAP_EVENTS_PACKAGE, sizeof(ACAP_EVENTS_PACKAGE), "%s", appName->valuestring);
+	snprintf(ACAP_EVENTS_APPNAME, sizeof(ACAP_EVENTS_APPNAME), "%s", friendlyName->valuestring);
 	
 	LOG_TRACE("%s: %s %s\n",__func__,ACAP_EVENTS_PACKAGE,ACAP_EVENTS_APPNAME);
 
@@ -1643,7 +1673,7 @@ ACAP_EVENTS() {
 	
 	cJSON* events = ACAP_FILE_Read( "settings/events.json" );
 	if(!events)
-		LOG_WARN("Cannot load even event list\n")
+		LOG_WARN("Cannot load event list\n");
 	cJSON* event = events?events->child:0;
 	while( event ) {
 		ACAP_EVENTS_Add_Event_JSON( event );
@@ -1683,32 +1713,32 @@ ACAP_EVENTS_Parse( AXEvent *axEvent ) {
 		if( strcmp(nskp->key,"topic0") == 0 ) {
 //			LOG_TRACE("Parse: Topic 0: %s\n",(char*)value_element->str_value);
 			if( strcmp((char*)value_element->str_value,"CameraApplicationPlatform") == 0 )
-				sprintf(topics[0],"acap");
+				snprintf(topics[0], sizeof(topics[0]), "acap");
 			else
-				sprintf(topics[0],"%s",(char*)value_element->str_value);
+				snprintf(topics[0], sizeof(topics[0]), "%s",(char*)value_element->str_value);
 			isTopic = 1;
 		}
 		if( strcmp(nskp->key,"topic1") == 0 ) {
 //			LOG_TRACE("Parse: Topic 1: %s\n",(char*)value_element->str_value);
-			sprintf(topics[1],"%s",value_element->str_value);
+			snprintf(topics[1], sizeof(topics[1]), "%s",value_element->str_value);
 			isTopic = 1;
 		}
 		if( strcmp(nskp->key,"topic2") == 0 ) {
 //			LOG_TRACE("Parse: Topic 2: %s\n",(char*)value_element->str_value);
-			sprintf(topics[2],"%s",value_element->str_value);
+			snprintf(topics[2], sizeof(topics[2]), "%s",value_element->str_value);
 			isTopic = 1;
 		}
 		if( strcmp(nskp->key,"topic3") == 0 ) {
 //			LOG_TRACE("Parse: Topic 3: %s\n",(char*)value_element->str_value);
-			sprintf(topics[3],"%s",value_element->str_value);
+			snprintf(topics[3], sizeof(topics[3]), "%s",value_element->str_value);
 			isTopic = 1;
 		}
 		if( strcmp(nskp->key,"topic4") == 0 ) {
-			sprintf(topics[4],"%s",value_element->str_value);
+			snprintf(topics[4], sizeof(topics[4]), "%s",value_element->str_value);
 			isTopic = 1;
 		}
 		if( strcmp(nskp->key,"topic5") == 0 ) {
-			sprintf(topics[5],"%s",value_element->str_value);
+			snprintf(topics[5], sizeof(topics[5]), "%s",value_element->str_value);
 			isTopic = 1;
 		}
 		
@@ -1752,19 +1782,21 @@ ACAP_EVENTS_Parse( AXEvent *axEvent ) {
 			}
 		}
 	}
-	strcpy(topic,topics[0]);
+	strncpy(topic, topics[0], sizeof(topic) - 1);
+	topic[sizeof(topic) - 1] = '\0';
 	for(i=1;i<6;i++) {
 		if( strlen(topics[i]) > 0 ) {
-			strcat(topic,"/");
-			strcat(topic,topics[i]);
+			size_t current_len = strlen(topic);
+			size_t remaining = sizeof(topic) - current_len - 1;
+			if(remaining > 1) {
+				strncat(topic, "/", remaining);
+				remaining = sizeof(topic) - strlen(topic) - 1;
+				strncat(topic, topics[i], remaining);
+			}
 		}
 	}
 
 	//Special Device Event Filter
-	if( strcmp(topic,"Device/Configuration") == 0 ) {
-		cJSON_Delete(object);
-		return 0;
-	}
 	if( strcmp(topic,"Device/IO/Port") == 0 ) {
 		int port = cJSON_GetObjectItem(object,"port")?cJSON_GetObjectItem(object,"port")->valueint:-1;
 		if( port == -1 ) {
@@ -1880,7 +1912,7 @@ ACAP_EVENTS_Subscribe( cJSON *event, void* user_data ) {
 
 	// ----- TOPIC 0 ------
 	topic = cJSON_GetObjectItem( event,"topic0" );
-	if(!topic) {
+	if(!topic || !topic->child) {
 		LOG_WARN("ACAP_EVENTS_Subscribe: Invalid tag for topic 0");
 		return 0;
 	}
@@ -1894,6 +1926,11 @@ ACAP_EVENTS_Subscribe( cJSON *event, void* user_data ) {
 	// ----- TOPIC 1 ------
 	if( cJSON_GetObjectItem( event,"topic1" ) ) {
 		topic = cJSON_GetObjectItem( event,"topic1" );
+		if(!topic->child) {
+			LOG_WARN("ACAP_EVENTS_Subscribe: Invalid topic1 structure");
+			ax_event_key_value_set_free(keyset);
+			return 0;
+		}
 		if( !ax_event_key_value_set_add_key_value( keyset, "topic1", topic->child->string, topic->child->valuestring, AX_VALUE_TYPE_STRING,NULL) ) {
 			LOG_WARN("ACAP_EVENTS_Subscribe: Unable to subscribe to event (1)");
 			ax_event_key_value_set_free(keyset);
@@ -1904,6 +1941,11 @@ ACAP_EVENTS_Subscribe( cJSON *event, void* user_data ) {
 	//------ TOPIC 2 -------------
 	if( cJSON_GetObjectItem( event,"topic2" ) ) {
 		topic = cJSON_GetObjectItem( event,"topic2" );
+		if(!topic->child) {
+			LOG_WARN("ACAP_EVENTS_Subscribe: Invalid topic2 structure");
+			ax_event_key_value_set_free(keyset);
+			return 0;
+		}
 		if( !ax_event_key_value_set_add_key_value( keyset, "topic2", topic->child->string, topic->child->valuestring, AX_VALUE_TYPE_STRING,NULL) ) {
 			LOG_WARN("ACAP_EVENTS_Subscribe: Unable to subscribe to event (2)");
 			ax_event_key_value_set_free(keyset);
@@ -1911,10 +1953,15 @@ ACAP_EVENTS_Subscribe( cJSON *event, void* user_data ) {
 		}
 		LOG_TRACE("%s: topic2 %s:%s\n",__func__, topic->child->string, topic->child->valuestring );
 	}
-	
+
 	if( cJSON_GetObjectItem( event,"topic3" ) ) {
-		LOG_TRACE("%s: topic3:%s:%s", __func__,topic->child->string,topic->child->valuestring);
 		topic = cJSON_GetObjectItem( event,"topic3" );
+		if(!topic->child) {
+			LOG_WARN("ACAP_EVENTS_Subscribe: Invalid topic3 structure");
+			ax_event_key_value_set_free(keyset);
+			return 0;
+		}
+		LOG_TRACE("%s: topic3:%s:%s", __func__,topic->child->string,topic->child->valuestring);
 		if( !ax_event_key_value_set_add_key_value( keyset, "topic3", topic->child->string, topic->child->valuestring, AX_VALUE_TYPE_STRING,NULL) ) {
 			LOG_WARN("ACAP_EVENTS_Subscribe: Unable to subscribe to event (3)");
 			ax_event_key_value_set_free(keyset);
@@ -2311,12 +2358,13 @@ char* ACAP_VAPIX_Get(const char* endpoint) {
     }
 
     char* response = NULL; // Initialize response buffer
-    char* url = malloc(strlen("http://127.0.0.12/axis-cgi/") + strlen(endpoint) + 1);
+    size_t url_size = strlen("http://127.0.0.12/axis-cgi/") + strlen(endpoint) + 1;
+    char* url = malloc(url_size);
     if (!url) {
         LOG_WARN("%s: Memory allocation failed", __func__);
         return NULL;
     }
-    sprintf(url, "http://127.0.0.12/axis-cgi/%s", endpoint);
+    snprintf(url, url_size, "http://127.0.0.12/axis-cgi/%s", endpoint);
 
     curl_easy_setopt(VAPIX_CURL, CURLOPT_URL, url);
     curl_easy_setopt(VAPIX_CURL, CURLOPT_USERPWD, VAPIX_Credentials);
@@ -2355,12 +2403,13 @@ char* ACAP_VAPIX_Post(const char* endpoint, const char* request) {
 	LOG_TRACE("%s: %s %s\n",__func__,endpoint,request);
 
     char* response = NULL; // Initialize response buffer
-    char* url = malloc(strlen("http://127.0.0.12/axis-cgi/") + strlen(endpoint) + 1);
+    size_t url_size = strlen("http://127.0.0.12/axis-cgi/") + strlen(endpoint) + 1;
+    char* url = malloc(url_size);
     if (!url) {
         LOG_WARN("%s: Memory allocation failed", __func__);
         return NULL;
     }
-    sprintf(url, "http://127.0.0.12/axis-cgi/%s", endpoint);
+    snprintf(url, url_size, "http://127.0.0.12/axis-cgi/%s", endpoint);
 
     curl_easy_setopt(VAPIX_CURL, CURLOPT_URL, url);
     curl_easy_setopt(VAPIX_CURL, CURLOPT_USERPWD, VAPIX_Credentials);
@@ -2396,8 +2445,10 @@ static char* parse_credentials(GVariant* result) {
     char* password           = NULL;
 
     g_variant_get(result, "(&s)", &credentials_string);
-    if (sscanf(credentials_string, "%m[^:]:%ms", &id, &password) != 2)
+    if (sscanf(credentials_string, "%m[^:]:%ms", &id, &password) != 2) {
         LOG_WARN("%s: Error parsing credential string %s", __func__, credentials_string);
+        return NULL;
+    }
     char* credentials = g_strdup_printf("%s:%s", id, password);
 
     free(id);
