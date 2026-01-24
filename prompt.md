@@ -78,7 +78,7 @@ build.sh                       # Helper: builds and packages for upload
     ```json
     "httpConfig": [
       {"name": "app", "access": "admin", "type": "fastCgi"},
-      {"name": "", "access": "admin", "type": "fastCgi"},
+      {"name": "settings", "access": "admin", "type": "fastCgi"},
       {"name": "capture", "access": "admin", "type": "fastCgi"},
       {"name": "publish", "access": "admin", "type": "fastCgi"}
     ]
@@ -978,6 +978,7 @@ main(void) {
 > **What do you want your camera app to do?**
 
 ***
+
 
 
 
