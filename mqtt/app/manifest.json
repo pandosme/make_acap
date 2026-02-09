@@ -8,7 +8,7 @@
             "embeddedSdkVersion": "3.0",
             "vendorUrl": "https://pandosme.github.io",
             "runMode": "once",
-            "version": "4.4.0"
+            "version": "4.5.0"
         },
         "configuration": {
 			"settingPage": "index.html",

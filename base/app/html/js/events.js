@@ -61,7 +61,7 @@ function parseSOAPResponse(xmlString) {
 						eventObject.topic0.tnsaxis === "RecordingConfig" ||
 						eventObject.topic0.tns1 === "RecordingConfig" ||
 						eventObject.topic0.tnsaxis === "Audio Control"	||
-						eventObject.topic0.tnsxais === "MQTT" ||
+						eventObject.topic0.tnsaxis === "MQTT" ||
 						eventObject.topic0.tnsaxis === "Storage" ||
 						eventObject.topic0.tnsaxis === "PTZController"
 					)

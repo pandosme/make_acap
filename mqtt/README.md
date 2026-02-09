@@ -1,6 +1,9 @@
-# MQTT
+# MQTT Template
 
 Axis Devices have a built-in MQTT client. However, the ACAP SDK does not provide direct support to integrate with MQTT. This project provides an example of how to set up an MQTT client and allow users to configure broker connections.
+
+> For complete API documentation, see [doc/ACAP.md](../doc/ACAP.md).
+> For a comprehensive catalog of available device events, see [doc/EVENTS.md](../doc/EVENTS.md).
 
 Key points:
 

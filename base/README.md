@@ -4,6 +4,9 @@
 
 This project provides a comprehensive template for developing applications using the **Axis Camera Application Platform (ACAP) SDK version 4.0**. The template demonstrates key features and best practices for ACAP application development.
 
+> For complete API documentation, see [doc/ACAP.md](../doc/ACAP.md).
+> For a comprehensive catalog of available device events, see [doc/EVENTS.md](../doc/EVENTS.md).
+
 ## 🚀 Key Features
 
 - **HTTP CGI Endpoints**
@@ -12,23 +15,23 @@ This project provides a comprehensive template for developing applications using
 - **Event Handling Mechanisms**
 
 ## 📂 Project Structure
-The project can be cloned from https://github.com/pandosme/make_acap/tree/main/demo_template_sdk4
 ```
-.
-├── app
-│   ├── ACAP.c
-│   ├── ACAP.h
-│   ├── main.c
-│   ├── cJSON.c
-│   ├── cJSON.h
-│   ├── html
-│   │   ├── config
-│   │   │   ├── events.json
-│   │   │   └── settings.json
-│   │   ├── index.html
-│   │   └── js/css assets
-│   └── manifest.json
+base/
+├── app/
+│   ├── ACAP.c / ACAP.h      # SDK wrapper (do not modify)
+│   ├── cJSON.c / cJSON.h    # JSON parser
+│   ├── main.c               # Application logic (edit here)
+│   ├── Makefile
+│   ├── manifest.json
+│   ├── html/                 # Web UI
+│   │   ├── index.html, config.html, events.html, image.html, about.html
+│   │   ├── css/
+│   │   └── js/
+│   └── settings/
+│       ├── settings.json     # App configuration
+│       └── events.json       # Event declarations
 ├── Dockerfile
+├── build.sh
 └── README.md
 ```
 

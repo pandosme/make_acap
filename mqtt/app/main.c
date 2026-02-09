@@ -64,7 +64,9 @@ HTTP_ENDPOINT_Publish(ACAP_HTTP_Response response,const ACAP_HTTP_Request reques
 		ACAP_HTTP_Respond_Error(response, 400, "Payload must be set");
 		return;
 	}
-	if( MQTT_Publish( topic, payload, 0, 0 ) )
+	int published = MQTT_Publish( topic, payload, 0, 0 );
+	cJSON_Delete(body);
+	if( published )
 		ACAP_HTTP_Respond_Text(response, "Message sent");
 	else
 		ACAP_HTTP_Respond_Error(response, 500, "Message publish failed");

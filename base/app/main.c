@@ -42,36 +42,41 @@ HTTP_Endpoint_fire(const ACAP_HTTP_Response response, const ACAP_HTTP_Request re
 		return;
 	}
 
-	
+
     const char* id = ACAP_HTTP_Request_Param(request, "id");
     const char* value_str = ACAP_HTTP_Request_Param(request, "value");
     int state = value_str ? atoi(value_str) : 0;
 
-	LOG("Event fired %s %d\n",id,state);
+	LOG("Event fired %s %d\n", id ? id : "(null)", state);
 
-	if(id) {
-		LOG_TRACE("%s: Event id: %s\n",__func__,id);
-	} else {
+	if(!id) {
 		LOG_WARN("%s: Missing event id\n",__func__);
-		ACAP_HTTP_Respond_Error( response, 500, "Invalid event ID" );
+		free((void*)value_str);
+		ACAP_HTTP_Respond_Error( response, 400, "Missing event ID" );
 		return;
 	}
 
+	LOG_TRACE("%s: Event id: %s\n",__func__,id);
 	if(value_str) {
 		LOG_TRACE("%s: Event value: %s\n",__func__, value_str);
 	}
 
+	int handled = 0;
 	if( strcmp( id, "state" ) == 0 ) {
 		ACAP_EVENTS_Fire_State( id, state );
 		ACAP_HTTP_Respond_Text( response, "State event fired" );
-		return;
-	}
-	if( strcmp( id, "trigger" ) == 0 ) {
+		handled = 1;
+	} else if( strcmp( id, "trigger" ) == 0 ) {
 		ACAP_EVENTS_Fire( id );
 		ACAP_HTTP_Respond_Text( response, "Trigger event fired" );
-		return;
+		handled = 1;
 	}
-	ACAP_HTTP_Respond_Error( response, 500, "Invalid event ID" );
+
+	free((void*)id);
+	free((void*)value_str);
+
+	if(!handled)
+		ACAP_HTTP_Respond_Error( response, 400, "Invalid event ID" );
 }
 
 void
@@ -89,9 +94,11 @@ HTTP_Endpoint_capture(const ACAP_HTTP_Response response, const ACAP_HTTP_Request
 
     const char* width_str = ACAP_HTTP_Request_Param(request, "width");
     const char* height_str = ACAP_HTTP_Request_Param(request, "height");
-	
+
     int width = width_str ? atoi(width_str) : 1920;
     int height = height_str ? atoi(height_str) : 1080;
+    free((void*)width_str);
+    free((void*)height_str);
 	LOG("Image capture %dx%d\n",width,height);
 
     // Create VDO settings for snapshot
@@ -118,7 +125,7 @@ HTTP_Endpoint_capture(const ACAP_HTTP_Response response, const ACAP_HTTP_Request
     unsigned int size = vdo_frame_get_size(buffer);
 
     // Build HTTP response
-	ACAP_HTTP_Respond_String( response, "status: 200 OK\r\n");
+	ACAP_HTTP_Respond_String( response, "Status: 200 OK\r\n");
 	ACAP_HTTP_Respond_String( response, "Content-Description: File Transfer\r\n");
 	ACAP_HTTP_Respond_String( response, "Content-Type: image/jpeg\r\n");
 	ACAP_HTTP_Respond_String( response, "Content-Disposition: attachment; filename=snapshot.jpeg\r\n");
@@ -147,9 +154,9 @@ signal_handler(gpointer user_data) {
 int main(void) {
     openlog(APP_PACKAGE, LOG_PID|LOG_CONS, LOG_USER);
     LOG("------ Starting ACAP Service ------\n");
-    ACAP_STATUS_SetString("app", "status", "The application is starting");    
-    
+
     ACAP(APP_PACKAGE, Settings_Updated_Callback);
+    ACAP_STATUS_SetString("app", "status", "The application is starting");
     ACAP_HTTP_Node("capture", HTTP_Endpoint_capture);
     ACAP_HTTP_Node("fire", HTTP_Endpoint_fire);
     

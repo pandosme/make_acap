@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Event Selection</title>
+	<link rel="stylesheet" href="css/bootstrap.min.css">
+	<link rel="stylesheet" href="css/tom-select.bootstrap5.min.css">
+	<link rel="stylesheet" href="css/app.css">
+	<script src="js/jquery-3.7.1.min.js"></script>
+	<script src="js/bootstrap.bundle.min.js"></script>
+	<script src="js/tom-select.complete.min.js"></script>
+	<script src="js/events.js"></script>
+	<script src="js/toast.js"></script>
+</head>
+<body>
+	<header class="app-header">
+		<div class="app-name" id="app-name">&nbsp;</div>
+		<nav class="nav-bar">
+			<a href="index.html" class="active">Trigger</a>
+			<a href="about.html">About</a>
+		</nav>
+	</header>
+
+	<div class="page-content">
+
+		<!-- Trigger Configuration Card -->
+		<div class="card">
+			<div class="card-header">
+				<h5 class="card-title mb-0">Trigger Configuration</h5>
+			</div>
+			<div class="card-body">
+				<form id="trigger-form">
+
+					<!-- Trigger Type Selection -->
+					<div class="mb-4">
+						<label class="form-label fw-bold">Trigger Type</label>
+						<div class="btn-group w-100" role="group" style="max-width: 500px;">
+							<input type="radio" class="btn-check" name="triggerType" id="triggerType-none" value="none" checked>
+							<label class="btn btn-outline-secondary" for="triggerType-none">Disabled</label>
+							<input type="radio" class="btn-check" name="triggerType" id="triggerType-event" value="event">
+							<label class="btn btn-outline-primary" for="triggerType-event">Event Based</label>
+							<input type="radio" class="btn-check" name="triggerType" id="triggerType-timer" value="timer">
+							<label class="btn btn-outline-primary" for="triggerType-timer">Timer Based</label>
+						</div>
+					</div>
+
+					<!-- Event Trigger Section (shown when event is selected) -->
+					<div class="mb-4 d-none" id="event-section">
+						<label class="form-label fw-bold">Event</label>
+						<div style="max-width: 500px;">
+							<select id="trigger-event" placeholder="Select an event..."></select>
+						</div>
+						<small class="text-muted mt-1 d-block">Select a device event to monitor. When this event fires, the ACAP will trigger.</small>
+					</div>
+
+					<!-- Timer Section (shown when timer is selected) -->
+					<div class="mb-4 d-none" id="timer-section">
+						<label class="form-label fw-bold">Timer Interval</label>
+						<div class="input-group" style="max-width: 500px;">
+							<input type="number" class="form-control form-control-lg" id="timer-value" min="1" value="10">
+							<select class="form-select form-select-lg" id="timer-unit" style="max-width: 150px;">
+								<option value="1">Seconds</option>
+								<option value="60" selected>Minutes</option>
+								<option value="3600">Hours</option>
+							</select>
+						</div>
+						<small class="text-muted mt-1 d-block">The ACAP will trigger periodically at this interval.</small>
+					</div>
+
+					<!-- Save Button -->
+					<div class="mt-4">
+						<button type="submit" class="btn btn-primary btn-lg" id="save-btn">Save Configuration</button>
+						<button type="button" class="btn btn-outline-secondary btn-lg ms-2" id="test-btn" style="display:none;">Test Trigger</button>
+					</div>
+				</form>
+			</div>
+		</div>
+
+		<!-- Status Card -->
+		<div class="card">
+			<div class="card-header d-flex justify-content-between align-items-center">
+				<h5 class="card-title mb-0">Trigger Status</h5>
+				<span class="badge" id="status-badge">--</span>
+			</div>
+			<div class="card-body">
+				<div class="info-grid">
+					<div class="info-row">
+						<div class="info-label">Type:</div>
+						<div class="info-value"><span id="status-type">--</span></div>
+					</div>
+					<div class="info-row" id="status-event-row" style="display:none;">
+						<div class="info-label">Event:</div>
+						<div class="info-value"><span id="status-event">--</span></div>
+					</div>
+					<div class="info-row" id="status-interval-row" style="display:none;">
+						<div class="info-label">Interval:</div>
+						<div class="info-value"><span id="status-interval">--</span></div>
+					</div>
+					<div class="info-row">
+						<div class="info-label">Status:</div>
+						<div class="info-value"><span id="status-status">--</span></div>
+					</div>
+					<div class="info-row">
+						<div class="info-label">Active:</div>
+						<div class="info-value"><span id="status-active">--</span></div>
+					</div>
+					<div class="info-row">
+						<div class="info-label">Last Triggered:</div>
+						<div class="info-value"><span id="status-last">--</span></div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Event Declarations Card -->
+		<div class="card">
+			<div class="card-header">
+				<h5 class="card-title mb-0">Declared Events</h5>
+			</div>
+			<div class="card-body">
+				<p class="text-muted mb-3">This ACAP declares the following events that other services can subscribe to:</p>
+				<table class="table table-sm">
+					<thead>
+						<tr>
+							<th>Event</th>
+							<th>Type</th>
+							<th>Description</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td><strong>Event Selection: State</strong></td>
+							<td><span class="badge bg-info">Stateful</span></td>
+							<td>Mirrors the state of the monitored event (high/low)</td>
+						</tr>
+						<tr>
+							<td><strong>Event Selection: Trigger</strong></td>
+							<td><span class="badge bg-warning text-dark">Stateless</span></td>
+							<td>Fires each time the monitored event triggers or the timer interval elapses</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+		</div>
+	</div>
+
+<script>
+var availableEvents = [];
+var eventSelect = null;
+var currentSettings = {};
+var statusTimer = null;
+
+$(document).ready(function() {
+
+	// Load app info
+	$.ajax({
+		type: "GET",
+		url: 'app',
+		dataType: 'json',
+		cache: false,
+		success: function(app) {
+			document.title = app.manifest.acapPackageConf.setup.friendlyName;
+			$('#app-name').text(app.manifest.acapPackageConf.setup.friendlyName);
+			currentSettings = app.settings || {};
+			applySettingsToForm(currentSettings);
+			updateTestButton();
+		},
+		error: function(response) {
+			showToast("Failed to load application: " + response.statusText, 'danger');
+		}
+	});
+
+	// Initialize TomSelect for event selection
+	var selectEl = document.getElementById('trigger-event');
+	eventSelect = new TomSelect(selectEl, {
+		maxItems: 1,
+		valueField: 'name',
+		labelField: 'name',
+		searchField: 'name',
+		options: [],
+		create: false,
+		plugins: ['clear_button']
+	});
+
+	// Discover available device events
+	listEvents()
+		.then(function(events) {
+			availableEvents = events;
+			eventSelect.clearOptions();
+			eventSelect.addOption(events);
+
+			// Re-apply saved event selection if available
+			if (currentSettings.triggerType === 'event' &&
+				currentSettings.triggerEvent &&
+				currentSettings.triggerEvent.name) {
+				eventSelect.setValue(currentSettings.triggerEvent.name);
+			}
+		})
+		.catch(function(error) {
+			console.error('Failed to discover events:', error);
+			showToast('Failed to discover device events', 'warning');
+		});
+
+	// Trigger type toggle
+	$('input[name="triggerType"]').on('change', function() {
+		var selectedType = $('input[name="triggerType"]:checked').val();
+		$('#event-section').toggleClass('d-none', selectedType !== 'event');
+		$('#timer-section').toggleClass('d-none', selectedType !== 'timer');
+	});
+
+	// Form submission
+	$('#trigger-form').on('submit', function(e) {
+		e.preventDefault();
+		saveConfiguration();
+	});
+
+	// Test trigger button
+	$('#test-btn').on('click', function() {
+		$.ajax({
+			type: 'POST',
+			url: 'trigger',
+			success: function() {
+				showToast('Trigger fired successfully', 'success');
+				refreshStatus();
+			},
+			error: function(response) {
+				showToast('Failed to fire trigger: ' + response.statusText, 'danger');
+			}
+		});
+	});
+
+	// Start status polling
+	refreshStatus();
+	statusTimer = setInterval(refreshStatus, 5000);
+});
+
+function applySettingsToForm(settings) {
+	var type = settings.triggerType || 'none';
+
+	// Set trigger type radio
+	$('#triggerType-' + type).prop('checked', true);
+	$('#event-section').toggleClass('d-none', type !== 'event');
+	$('#timer-section').toggleClass('d-none', type !== 'timer');
+
+	// Set event selection
+	if (type === 'event' && settings.triggerEvent && settings.triggerEvent.name) {
+		if (eventSelect) {
+			eventSelect.setValue(settings.triggerEvent.name);
+		}
+	}
+
+	// Set timer values
+	if (settings.timer) {
+		var seconds = settings.timer;
+		if (seconds % 3600 === 0 && seconds >= 3600) {
+			$('#timer-value').val(seconds / 3600);
+			$('#timer-unit').val('3600');
+		} else if (seconds % 60 === 0 && seconds >= 60) {
+			$('#timer-value').val(seconds / 60);
+			$('#timer-unit').val('60');
+		} else {
+			$('#timer-value').val(seconds);
+			$('#timer-unit').val('1');
+		}
+	}
+}
+
+function saveConfiguration() {
+	var triggerType = $('input[name="triggerType"]:checked').val();
+	var settings = {
+		triggerType: triggerType,
+		triggerEvent: null,
+		timer: 60
+	};
+
+	if (triggerType === 'event') {
+		var selectedEventName = $('#trigger-event').val();
+		if (!selectedEventName) {
+			showToast('Please select an event', 'warning');
+			return;
+		}
+		var fullEvent = availableEvents.find(function(ev) {
+			return ev.name === selectedEventName;
+		});
+		if (fullEvent) {
+			// Build clean trigger event with only name and topics
+			var triggerEvent = { name: fullEvent.name };
+			Object.keys(fullEvent).forEach(function(key) {
+				if (key.startsWith('topic')) {
+					triggerEvent[key] = fullEvent[key];
+				}
+			});
+			settings.triggerEvent = triggerEvent;
+		} else {
+			showToast('Selected event not found', 'danger');
+			return;
+		}
+	} else if (triggerType === 'timer') {
+		var timerValue = parseInt($('#timer-value').val());
+		var timerUnit = parseInt($('#timer-unit').val());
+		if (!timerValue || timerValue < 1) {
+			showToast('Please enter a valid timer interval', 'warning');
+			return;
+		}
+		settings.timer = timerValue * timerUnit;
+	}
+
+	$('#save-btn').prop('disabled', true).text('Saving...');
+
+	$.ajax({
+		type: 'POST',
+		url: 'settings',
+		contentType: 'application/json',
+		data: JSON.stringify(settings),
+		success: function() {
+			currentSettings = settings;
+			showToast('Configuration saved successfully', 'success');
+			$('#save-btn').prop('disabled', false).text('Save Configuration');
+			updateTestButton();
+			setTimeout(refreshStatus, 1000);
+		},
+		error: function(response) {
+			showToast('Failed to save configuration: ' + response.statusText, 'danger');
+			$('#save-btn').prop('disabled', false).text('Save Configuration');
+		}
+	});
+}
+
+function updateTestButton() {
+	var type = $('input[name="triggerType"]:checked').val();
+	if (type !== 'none') {
+		$('#test-btn').show();
+	} else {
+		$('#test-btn').hide();
+	}
+}
+
+function refreshStatus() {
+	$.ajax({
+		type: 'GET',
+		url: 'status',
+		dataType: 'json',
+		cache: false,
+		success: function(status) {
+			var trigger = status.trigger || {};
+			$('#status-type').text(trigger.type || 'none');
+			$('#status-status').text(trigger.status || '--');
+			$('#status-last').text(trigger.lastTriggered || 'Never');
+
+			var isActive = trigger.active;
+			if (isActive === true || isActive === 1) {
+				$('#status-active').html('<span class="badge bg-success">Active</span>');
+			} else if (isActive === false || isActive === 0) {
+				$('#status-active').html('<span class="badge bg-secondary">Inactive</span>');
+			} else {
+				$('#status-active').text('--');
+			}
+
+			// Show/hide type-specific status rows
+			if (trigger.type === 'event') {
+				$('#status-event-row').show();
+				$('#status-interval-row').hide();
+				$('#status-event').text(trigger.event || '--');
+			} else if (trigger.type === 'timer') {
+				$('#status-event-row').hide();
+				$('#status-interval-row').show();
+				$('#status-interval').text(formatInterval(trigger.interval));
+			} else {
+				$('#status-event-row').hide();
+				$('#status-interval-row').hide();
+			}
+
+			// Status badge
+			if (trigger.status === 'Monitoring event' || trigger.status === 'Timer running') {
+				$('#status-badge').attr('class', 'badge bg-success').text('Running');
+			} else if (trigger.status === 'Disabled') {
+				$('#status-badge').attr('class', 'badge bg-secondary').text('Disabled');
+			} else if (trigger.status && trigger.status.indexOf('failed') >= 0) {
+				$('#status-badge').attr('class', 'badge bg-danger').text('Error');
+			} else {
+				$('#status-badge').attr('class', 'badge bg-warning text-dark').text(trigger.status || '--');
+			}
+		},
+		error: function() {
+			// Silently ignore polling errors
+		}
+	});
+}
+
+function formatInterval(seconds) {
+	if (!seconds) return '--';
+	if (seconds >= 3600 && seconds % 3600 === 0) return (seconds / 3600) + ' hour(s)';
+	if (seconds >= 60 && seconds % 60 === 0) return (seconds / 60) + ' minute(s)';
+	return seconds + ' second(s)';
+}
+</script>
+</body>
+</html>

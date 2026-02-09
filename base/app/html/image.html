@@ -1,57 +1,54 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title></title>
-    <link rel="stylesheet" href="css/bootstrap.min.css">
-    <link rel="stylesheet" href="css/app.css">
-    <script src="js/jquery-3.7.1.min.js"></script>
-    <script src="js/bootstrap.bundle.min.js"></script>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title></title>
+	<link rel="stylesheet" href="css/bootstrap.min.css">
+	<link rel="stylesheet" href="css/app.css">
+	<script src="js/jquery-3.7.1.min.js"></script>
+	<script src="js/bootstrap.bundle.min.js"></script>
+	<script src="js/toast.js"></script>
 </head>
 <body>
-<div class="d-flex" id="wrapper">
-	<div class="bg-light border-right" id="sidebar-wrapper">
-        <div class="sidebar-heading">&nbsp;</div>
-		<div class="list-group list-group-flush">
-			<a href="index.html" class="list-group-item list-group-item-action">Video</a>
-			<a href="image.html" class="list-group-item list-group-item-action active">Image</a>
-			<a href="config.html" class="list-group-item list-group-item-action">Config</a>
-			<a href="events.html" class="list-group-item list-group-item-action">Events</a>
-			<a href="about.html" class="list-group-item list-group-item-action">About</a>
-		</div>
-	</div>
-	<div id="page-content-wrapper" class="p-0">
-		<div class="container-fluid">
-			<div class="col-12">
-				<div class="card">
-					<div class="card-header">
-						<h5 class="card-title mb-0">Image</h5>
+	<header class="app-header">
+		<div class="app-name" id="app-name">&nbsp;</div>
+		<nav class="nav-bar">
+			<a href="index.html">Video</a>
+			<a href="image.html" class="active">Image</a>
+			<a href="config.html">Config</a>
+			<a href="events.html">Events</a>
+			<a href="about.html">About</a>
+		</nav>
+	</header>
+
+	<div class="page-content">
+		<div class="card">
+			<div class="card-header">
+				<h5 class="card-title mb-0">Image</h5>
+			</div>
+			<div class="card-body">
+				<div class="row mb-3 align-items-center g-2">
+					<div class="col-12 col-md-auto mb-2 mb-md-0">
+						<select class="form-control" id="snapshot-resolution"></select>
 					</div>
-					<div class="card-body" id="settings-form">
-						<div class="row mb-3 align-items-center g-2">
-							<div class="col-12 col-md-auto mb-2 mb-md-0">
-								<select class="form-control" id="snapshot-resolution"></select>
-							</div>
-							<div class="col-6 col-md-auto mb-2 mb-md-0">
-								<button id="refresh-snapshot" class="btn btn-primary w-100">Refresh</button>
-							</div>
-							<div class="col-6 col-md-auto">
-								<button id="capture-snapshot" class="btn btn-primary w-100">Download</button>
-							</div>
-						</div>
-						<div class="image-container" style="height: 480px;">
-							<img id="snapshot-img"
-								src=""
-								alt="Image"
-								style="width: 100%; height: 100%; object-fit: contain;">
-						</div>
+					<div class="col-6 col-md-auto mb-2 mb-md-0">
+						<button id="refresh-snapshot" class="btn btn-primary w-100">Refresh</button>
 					</div>
+					<div class="col-6 col-md-auto">
+						<button id="capture-snapshot" class="btn btn-primary w-100">Download</button>
+					</div>
+				</div>
+				<div class="image-container" style="height: 480px;">
+					<img id="snapshot-img"
+						src=""
+						alt="Image"
+						style="width: 100%; height: 100%; object-fit: contain;">
 				</div>
 			</div>
 		</div>
 	</div>
-</div>
+
 <script>
 $(document).ready(function() {
 	$.ajax({
@@ -61,7 +58,7 @@ $(document).ready(function() {
 		cache: false,
 		success: function(data) {
 			document.title = data.manifest.acapPackageConf.setup.friendlyName;
-			$('.sidebar-heading').text(data.manifest.acapPackageConf.setup.friendlyName);
+			$('#app-name').text(data.manifest.acapPackageConf.setup.friendlyName);
 			const aspectRatio = data.device.aspect || '16:9';
 			const resolutions = data.device.resolutions[aspectRatio] || [];
 			const $select = $('#snapshot-resolution');
@@ -73,29 +70,25 @@ $(document).ready(function() {
 				resolutions.forEach(function(r) {
 					$select.append('<option value="' + r + '">' + r + '</option>');
 				});
-				// Set initial image to first resolution
 				const initialRes = resolutions[0];
 				loadImage(initialRes);
 			}
 		},
 		error: function(response) {
-			alert('Failed to load device information: ' + response.statusText);
+			showToast("Failed to load device information: " + response.statusText, 'danger');
 		}
 	});
-	
-	// Event handler for resolution change
+
 	$('#snapshot-resolution').on('change', function() {
 		const selectedResolution = $(this).val();
 		loadImage(selectedResolution);
 	});
 
-	// Just reload image, not page!
 	$('#refresh-snapshot').on('click', function() {
 		const selectedResolution = $('#snapshot-resolution').val();
 		loadImage(selectedResolution);
 	});
 
-	// Snapshot capture functionality
 	$('#capture-snapshot').on('click', function() {
 		const selectedResolution = $('#snapshot-resolution').val();
 		if(!selectedResolution) return;
@@ -110,7 +103,6 @@ $(document).ready(function() {
 
 	function loadImage(resolution) {
 		if(!resolution) return;
-		// Add cache-buster so browser always loads!
 		const ts = Date.now();
 		const url = '/axis-cgi/jpg/image.cgi?resolution=' + resolution + '&t=' + ts;
 		$('#snapshot-img').attr('src', url);

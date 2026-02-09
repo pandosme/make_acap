@@ -1,0 +1,4 @@
+[
+	{ "id": "state",   "name": "Event Selection: State",   "state": true,  "show": true, "data": [] },
+	{ "id": "trigger", "name": "Event Selection: Trigger", "state": false, "show": true, "data": [] }
+]

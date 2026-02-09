@@ -1,5 +1,5 @@
 /*
- * ACAP SDK wrapper for verion ACAP SDK 12.x
+ * ACAP SDK wrapper for version ACAP SDK 12.x
  * Copyright (c) 2025 Fred Juhlin
  * MIT License - See LICENSE file for details
  * Version 4.0
@@ -125,8 +125,11 @@ cJSON* ACAP(const char* package, ACAP_Config_Update callback) {
 
     // Initialize subsystems
 	ACAP_VAPIX_Init();
-    ACAP_EVENTS();
-	ACAP_HTTP();
+    cJSON* events = ACAP_EVENTS();
+    if (events) {
+        cJSON_Delete(events);
+    }
+    ACAP_HTTP();
     
     // Register core services
     ACAP_Set_Config("status", ACAP_STATUS());
@@ -250,12 +253,12 @@ ACAP_Set_Config(const char* service, cJSON* serviceSettings ) {
 
 cJSON*
 ACAP_Get_Config(const char* service) {
-	cJSON* reqestedService = cJSON_GetObjectItem(app, service );
-	if( !reqestedService ) {
+	cJSON* requestedService = cJSON_GetObjectItem(app, service );
+	if( !requestedService ) {
 		LOG_WARN("%s: %s is undefined\n",__func__,service);
-		return 0;
+		return NULL;
 	}
-	return reqestedService;
+	return requestedService;
 }
 
 /*------------------------------------------------------------------
@@ -286,14 +289,13 @@ static HTTPNode http_nodes[ACAP_MAX_HTTP_NODES];
 static int http_node_count = 0;
 
 
-static const char* get_path_without_query(const char* uri) {
-    static char path[ACAP_MAX_PATH_LENGTH];
+static const char* get_path_without_query(const char* uri, char* path, size_t path_size) {
     const char* query = strchr(uri, '?');
-    
+
     if (query) {
         size_t path_length = query - uri;
-        if (path_length >= ACAP_MAX_PATH_LENGTH) {
-            path_length = ACAP_MAX_PATH_LENGTH - 1;
+        if (path_length >= path_size) {
+            path_length = path_size - 1;
         }
         strncpy(path, uri, path_length);
         path[path_length] = '\0';
@@ -473,7 +475,8 @@ void ACAP_HTTP_Process() {
     //LOG_TRACE("%s: Processing URI: %s\n", __func__, uriString);
 
     // Find and execute matching callback
-    const char* pathOnly = get_path_without_query(uriString);
+    char pathBuffer[ACAP_MAX_PATH_LENGTH];
+    const char* pathOnly = get_path_without_query(uriString, pathBuffer, sizeof(pathBuffer));
     ACAP_HTTP_Callback matching_callback = NULL;
 
     for (int i = 0; i < http_node_count; i++) {
@@ -635,7 +638,7 @@ int ACAP_HTTP_Respond_String(ACAP_HTTP_Response response, const char *fmt, ...) 
         return 0;
     }
 
-    char buffer[4096];
+    char buffer[8192];
     va_list args;
     va_start(args, fmt);
     int written = vsnprintf(buffer, sizeof(buffer), fmt, args);
@@ -709,7 +712,7 @@ int ACAP_HTTP_Respond_Text(ACAP_HTTP_Response response, const char* message) {
  * Status Management Implementation
  *------------------------------------------------------------------*/
 
-pthread_mutex_t status_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t status_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static void ACAP_ENDPOINT_status(const ACAP_HTTP_Response response, const ACAP_HTTP_Request request) {
 																						  
@@ -931,9 +934,9 @@ cJSON* ACAP_STATUS_Object(const char* group, const char* name) {
 
 static cJSON* ACAP_DEVICE_Container = NULL;
 
-double previousTransmitted = 0;
-double previousNetworkTimestamp = 0;
-double previousNetworkAverage = 0;
+static double previousTransmitted = 0;
+static double previousNetworkTimestamp = 0;
+static double previousNetworkAverage = 0;
 char** string_split( char* a_str,  char a_delim);
 
 double
@@ -1025,18 +1028,20 @@ ACAP_DEVICE_Uptime() {
 	return (double)info.uptime; 
 };	
 
-const char* 
+const char*
 ACAP_DEVICE_Prop( const char *attribute ) {
 	if( !ACAP_DEVICE_Container )
-		return 0;
-	return cJSON_GetObjectItem(ACAP_DEVICE_Container,attribute) ? cJSON_GetObjectItem(ACAP_DEVICE_Container,attribute)->valuestring : 0;
+		return NULL;
+	cJSON* item = cJSON_GetObjectItem(ACAP_DEVICE_Container, attribute);
+	return (item && cJSON_IsString(item)) ? item->valuestring : NULL;
 }
 
 int
 ACAP_DEVICE_Prop_Int( const char *attribute ) {
   if( !ACAP_DEVICE_Container )
     return 0;
-  return cJSON_GetObjectItem(ACAP_DEVICE_Container,attribute) ? cJSON_GetObjectItem(ACAP_DEVICE_Container,attribute)->valueint : 0;
+  cJSON* item = cJSON_GetObjectItem(ACAP_DEVICE_Container, attribute);
+  return (item && cJSON_IsNumber(item)) ? item->valueint : 0;
 }
 
 cJSON* 
@@ -1398,51 +1403,53 @@ ACAP_DEVICE_Set_Location( double lat, double lon) {
 int
 ACAP_DEVICE_Seconds_Since_Midnight() {
 	time_t t = time(NULL);
-	struct tm tm = *localtime(&t);
+	struct tm tm;
+	localtime_r(&t, &tm);
 	int seconds = tm.tm_hour * 3600;
 	seconds += tm.tm_min * 60;
 	seconds += tm.tm_sec;
 	return seconds;
 }
 
-char ACAP_DEVICE_timestring[128] = "2020-01-01 00:00:00";
-char ACAP_DEVICE_date[128] = "2023-01-01";
-char ACAP_DEVICE_time[128] = "00:00:00";
-char ACAP_DEVICE_isostring[128] = "2020-01-01T00:00:00+0000";
+static char ACAP_DEVICE_timestring[128] = "2020-01-01 00:00:00";
+static char ACAP_DEVICE_date[128] = "2023-01-01";
+static char ACAP_DEVICE_time[128] = "00:00:00";
+static char ACAP_DEVICE_isostring[128] = "2020-01-01T00:00:00+0000";
 
 const char*
 ACAP_DEVICE_Date() {
 	time_t t = time(NULL);
-	struct tm *tm = localtime(&t);
-	snprintf(ACAP_DEVICE_date, sizeof(ACAP_DEVICE_date), "%d-%02d-%02d",tm->tm_year + 1900,tm->tm_mon + 1, tm->tm_mday);
+	struct tm tm;
+	localtime_r(&t, &tm);
+	snprintf(ACAP_DEVICE_date, sizeof(ACAP_DEVICE_date), "%d-%02d-%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday);
 	return ACAP_DEVICE_date;
 }
 
 const char*
 ACAP_DEVICE_Time() {
 	time_t t = time(NULL);
-	struct tm *tm = localtime(&t);
-	snprintf(ACAP_DEVICE_time, sizeof(ACAP_DEVICE_time), "%02d:%02d:%02d",tm->tm_hour,tm->tm_min,tm->tm_sec);
+	struct tm tm;
+	localtime_r(&t, &tm);
+	snprintf(ACAP_DEVICE_time, sizeof(ACAP_DEVICE_time), "%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec);
 	return ACAP_DEVICE_time;
 }
-
 
 const char*
 ACAP_DEVICE_Local_Time() {
 	time_t t = time(NULL);
-	struct tm *tm = localtime(&t);
-	snprintf(ACAP_DEVICE_timestring, sizeof(ACAP_DEVICE_timestring), "%d-%02d-%02d %02d:%02d:%02d",tm->tm_year + 1900,tm->tm_mon + 1, tm->tm_mday,tm->tm_hour,tm->tm_min,tm->tm_sec);
+	struct tm tm;
+	localtime_r(&t, &tm);
+	snprintf(ACAP_DEVICE_timestring, sizeof(ACAP_DEVICE_timestring), "%d-%02d-%02d %02d:%02d:%02d", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
 	LOG_TRACE("Local Time: %s\n",ACAP_DEVICE_timestring);
 	return ACAP_DEVICE_timestring;
 }
 
-
-
 const char*
 ACAP_DEVICE_ISOTime() {
 	time_t t = time(NULL);
-	struct tm *tm = localtime(&t);
-	strftime(ACAP_DEVICE_isostring, 50, "%Y-%m-%dT%T%z",tm);
+	struct tm tm;
+	localtime_r(&t, &tm);
+	strftime(ACAP_DEVICE_isostring, 50, "%Y-%m-%dT%T%z", &tm);
 	return ACAP_DEVICE_isostring;
 }
 
@@ -1595,27 +1602,85 @@ int ACAP_FILE_Write(const char* filepath, cJSON* object) {
     return 1;
 }
 
+int ACAP_FILE_WriteData(const char* filepath, const char* data) {
+    if (!filepath || !data) {
+        LOG_WARN("Invalid parameters for file write data\n");
+        return 0;
+    }
+
+    FILE* file = ACAP_FILE_Open(filepath, "w");
+    if (!file) {
+        LOG_WARN("Error opening %s for writing\n", filepath);
+        return 0;
+    }
+
+    int result = fputs(data, file);
+    fclose(file);
+
+    if (result < 0) {
+        LOG_WARN("Write error in %s\n", filepath);
+        return 0;
+    }
+
+    return 1;
+}
+
+int ACAP_FILE_Exists(const char* filepath) {
+    if (!filepath) {
+        return 0;
+    }
+
+    char fullpath[ACAP_MAX_PATH_LENGTH];
+    if (snprintf(fullpath, sizeof(fullpath), "%s%s", ACAP_FILE_Path, filepath) >= (int)sizeof(fullpath)) {
+        return 0;
+    }
+
+    return access(fullpath, F_OK) == 0;
+}
+
+cJSON* ACAP_HTTP_Request_JSON(const ACAP_HTTP_Request request, const char* param) {
+    if (!request) {
+        return NULL;
+    }
+
+    // If param is provided, extract from query string
+    if (param) {
+        const char* value = ACAP_HTTP_Request_Param(request, param);
+        if (!value) {
+            return NULL;
+        }
+        cJSON* json = cJSON_Parse(value);
+        free((void*)value);
+        return json;
+    }
+
+    // Otherwise parse POST body as JSON
+    if (!request->postData || request->postDataLength == 0) {
+        return NULL;
+    }
+
+    const char* contentType = ACAP_HTTP_Get_Content_Type(request);
+    if (!contentType || strcmp(contentType, "application/json") != 0) {
+        return NULL;
+    }
+
+    return cJSON_Parse(request->postData);
+}
+
 /*------------------------------------------------------------------
  * Events System Implementation
  *------------------------------------------------------------------*/
 
-ACAP_EVENTS_Callback EVENT_USER_CALLBACK = 0;
+static ACAP_EVENTS_Callback EVENT_USER_CALLBACK = 0;
 static void ACAP_EVENTS_Main_Callback(guint subscription, AXEvent *event, gpointer user_data);
-cJSON* ACAP_EVENTS_SUBSCRIPTIONS = 0;
-cJSON* ACAP_EVENTS_DECLARATIONS = 0;
-AXEventHandler *ACAP_EVENTS_HANDLER = 0;
+static cJSON* ACAP_EVENTS_SUBSCRIPTIONS = 0;
+static cJSON* ACAP_EVENTS_DECLARATIONS = 0;
+static AXEventHandler *ACAP_EVENTS_HANDLER = 0;
 
+static double ioFilterTimestamps[4] = {0};
 
-double ioFilterTimestamp0 = 0;
-double ioFilterTimestamp1 = 0;
-double ioFilterTimestamp2 = 0;
-double ioFilterTimestamp3 = 0;
-
-char ACAP_EVENTS_PACKAGE[64];
-char ACAP_EVENTS_APPNAME[64];
-
-
-cJSON* SubscriptionsArray = 0;
+static char ACAP_EVENTS_PACKAGE[64];
+static char ACAP_EVENTS_APPNAME[64];
 typedef struct S_AXEventKeyValueSet {
 	GHashTable *key_values;
 } T_ValueSet;
@@ -1799,41 +1864,16 @@ ACAP_EVENTS_Parse( AXEvent *axEvent ) {
 	//Special Device Event Filter
 	if( strcmp(topic,"Device/IO/Port") == 0 ) {
 		int port = cJSON_GetObjectItem(object,"port")?cJSON_GetObjectItem(object,"port")->valueint:-1;
-		if( port == -1 ) {
+		if( port < 0 || port > 3 ) {
 			cJSON_Delete(object);
 			return 0;
 		}
-		if( port == 0 ) {
-			if( ACAP_DEVICE_Timestamp() - ioFilterTimestamp0 < 1000 ) {
-				cJSON_Delete(object);
-				return 0;
-			}
-			ioFilterTimestamp0 = ACAP_DEVICE_Timestamp();
+		double now = ACAP_DEVICE_Timestamp();
+		if( now - ioFilterTimestamps[port] < 1000 ) {
+			cJSON_Delete(object);
+			return 0;
 		}
-		
-		if( port == 1 ) {
-			if( ACAP_DEVICE_Timestamp() - ioFilterTimestamp1 < 1000 ) {
-				cJSON_Delete(object);
-				return 0;
-			}
-			ioFilterTimestamp1 = ACAP_DEVICE_Timestamp();
-		}
-		
-		if( port == 2 ) {
-			if( ACAP_DEVICE_Timestamp() - ioFilterTimestamp2 < 1000 ) {
-				cJSON_Delete(object);
-				return 0;
-			}
-			ioFilterTimestamp2 = ACAP_DEVICE_Timestamp();
-		}
-
-		if( port == 3 ) {
-			if( ACAP_DEVICE_Timestamp() - ioFilterTimestamp3 < 1000 ) {
-				cJSON_Delete(object);
-				return 0;
-			}
-			ioFilterTimestamp3 = ACAP_DEVICE_Timestamp();
-		}
+		ioFilterTimestamps[port] = now;
 	}
 
 	cJSON_AddStringToObject(object,"event",topic);
@@ -1852,7 +1892,8 @@ ACAP_EVENTS_Main_Callback(guint subscription, AXEvent *axEvent, gpointer user_da
 		return;
 	}
 
-	cJSON_AddItemReferenceToObject(eventData, "source", (cJSON*)user_data);	
+	if( user_data )
+		cJSON_AddItemReferenceToObject(eventData, "source", (cJSON*)user_data);
 	if( EVENT_USER_CALLBACK )
 		EVENT_USER_CALLBACK( eventData, (void*)user_data );
 	cJSON_Delete(eventData);
@@ -1881,15 +1922,15 @@ ACAP_EVENTS_Subscribe( cJSON *event, void* user_data ) {
 		return 0;
 	}
 
+	if( !event ) {
+		LOG_WARN("%s: Invalid event\n",__func__);
+		return 0;
+	}
+
 	char *json = cJSON_PrintUnformatted(event);
 	if( json ) {
 		LOG_TRACE("%s: %s\n",__func__,json);
 		free(json);
-	}
-
-	if( !event ) {
-		LOG_WARN("%s: Invalid event\n",__func__);
-		return 0;
 	}
 
 
@@ -1914,6 +1955,7 @@ ACAP_EVENTS_Subscribe( cJSON *event, void* user_data ) {
 	topic = cJSON_GetObjectItem( event,"topic0" );
 	if(!topic || !topic->child) {
 		LOG_WARN("ACAP_EVENTS_Subscribe: Invalid tag for topic 0");
+		ax_event_key_value_set_free(keyset);
 		return 0;
 	}
 	if( !ax_event_key_value_set_add_key_value( keyset, "topic0", topic->child->string, topic->child->valuestring, AX_VALUE_TYPE_STRING,NULL) ) {
@@ -2005,22 +2047,14 @@ int ACAP_EVENTS_Unsubscribe(int id) {
         ACAP_EVENTS_SUBSCRIPTIONS = cJSON_CreateArray();
     } else {
         // Find and remove specific subscription
-        cJSON* event = ACAP_EVENTS_SUBSCRIPTIONS->child;
-        cJSON* prev = NULL;
-        
-        while (event) {
-            if (event->valueint == id) {
+        int arraySize = cJSON_GetArraySize(ACAP_EVENTS_SUBSCRIPTIONS);
+        for (int i = 0; i < arraySize; i++) {
+            cJSON* item = cJSON_GetArrayItem(ACAP_EVENTS_SUBSCRIPTIONS, i);
+            if (item && item->valueint == id) {
                 ax_event_handler_unsubscribe(ACAP_EVENTS_HANDLER, (guint)id, 0);
-                if (prev) {
-                    prev->next = event->next;
-                } else {
-                    ACAP_EVENTS_SUBSCRIPTIONS->child = event->next;
-                }
-                cJSON_Delete(event);
+                cJSON_DeleteItemFromArray(ACAP_EVENTS_SUBSCRIPTIONS, i);
                 break;
             }
-            prev = event;
-            event = event->next;
         }
     }
     
@@ -2327,8 +2361,9 @@ ACAP_EVENTS_Add_Event_JSON( cJSON* event ) {
 /*-----------------------------------------------------
  * VAPIX
  *-----------------------------------------------------*/
-char *VAPIX_Credentials = 0;
-CURL* VAPIX_CURL = 0;
+static char *VAPIX_Credentials = 0;
+static CURL* VAPIX_CURL = 0;
+static pthread_mutex_t vapix_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 // Callback function to append data to a dynamically allocated buffer
 static size_t append_to_buffer_callback(char* ptr, size_t size, size_t nmemb, void* userdata) {
@@ -2366,6 +2401,7 @@ char* ACAP_VAPIX_Get(const char* endpoint) {
     }
     snprintf(url, url_size, "http://127.0.0.12/axis-cgi/%s", endpoint);
 
+    pthread_mutex_lock(&vapix_mutex);
     curl_easy_setopt(VAPIX_CURL, CURLOPT_URL, url);
     curl_easy_setopt(VAPIX_CURL, CURLOPT_USERPWD, VAPIX_Credentials);
     curl_easy_setopt(VAPIX_CURL, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
@@ -2374,6 +2410,7 @@ char* ACAP_VAPIX_Get(const char* endpoint) {
     curl_easy_setopt(VAPIX_CURL, CURLOPT_WRITEDATA, &response);
 
     CURLcode res = curl_easy_perform(VAPIX_CURL);
+    pthread_mutex_unlock(&vapix_mutex);
     free(url);
 
     if (res != CURLE_OK) {
@@ -2411,6 +2448,7 @@ char* ACAP_VAPIX_Post(const char* endpoint, const char* request) {
     }
     snprintf(url, url_size, "http://127.0.0.12/axis-cgi/%s", endpoint);
 
+    pthread_mutex_lock(&vapix_mutex);
     curl_easy_setopt(VAPIX_CURL, CURLOPT_URL, url);
     curl_easy_setopt(VAPIX_CURL, CURLOPT_USERPWD, VAPIX_Credentials);
     curl_easy_setopt(VAPIX_CURL, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
@@ -2419,6 +2457,7 @@ char* ACAP_VAPIX_Post(const char* endpoint, const char* request) {
     curl_easy_setopt(VAPIX_CURL, CURLOPT_WRITEDATA, &response);
 
     CURLcode res = curl_easy_perform(VAPIX_CURL);
+    pthread_mutex_unlock(&vapix_mutex);
     free(url);
 
     if (res != CURLE_OK) {
@@ -2506,25 +2545,45 @@ ACAP_VAPIX_Init() {
  *------------------------------------------------------------------*/
 
 void ACAP_Cleanup(void) {
-    // Clean up other resources
+    LOG_TRACE("%s:",__func__);
+
+    // Clean up HTTP subsystem
     ACAP_HTTP_Cleanup();
-	
-    if (status_container) {
-        cJSON_Delete(status_container);
-        status_container = NULL;
+
+    // Clean up event handler
+    if (ACAP_EVENTS_HANDLER) {
+        ax_event_handler_free(ACAP_EVENTS_HANDLER);
+        ACAP_EVENTS_HANDLER = NULL;
+    }
+    if (ACAP_EVENTS_SUBSCRIPTIONS) {
+        cJSON_Delete(ACAP_EVENTS_SUBSCRIPTIONS);
+        ACAP_EVENTS_SUBSCRIPTIONS = NULL;
+    }
+    if (ACAP_EVENTS_DECLARATIONS) {
+        cJSON_Delete(ACAP_EVENTS_DECLARATIONS);
+        ACAP_EVENTS_DECLARATIONS = NULL;
     }
 
-	LOG_TRACE("%s:",__func__);
+    // status_container and ACAP_DEVICE_Container are children of app,
+    // so deleting app will free them. Just NULL the pointers.
+    status_container = NULL;
+    ACAP_DEVICE_Container = NULL;
+
     if (app) {
         cJSON_Delete(app);
         app = NULL;
     }
-    
-    if (ACAP_DEVICE_Container) {
-        cJSON_Delete(ACAP_DEVICE_Container);
-        ACAP_DEVICE_Container = NULL;
+
+    // Clean up VAPIX resources
+    if (VAPIX_CURL) {
+        curl_easy_cleanup(VAPIX_CURL);
+        VAPIX_CURL = NULL;
     }
-    
+    if (VAPIX_Credentials) {
+        g_free(VAPIX_Credentials);
+        VAPIX_Credentials = NULL;
+    }
+
     http_node_count = 0;
     ACAP_UpdateCallback = NULL;
 }

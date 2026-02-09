@@ -1,119 +1,112 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title></title>
-    <link rel="stylesheet" href="css/bootstrap.min.css">
-    <link rel="stylesheet" href="css/app.css">
-    <script src="js/jquery-3.7.1.min.js"></script>
-    <script src="js/bootstrap.bundle.min.js"></script>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title></title>
+	<link rel="stylesheet" href="css/bootstrap.min.css">
+	<link rel="stylesheet" href="css/app.css">
+	<script src="js/jquery-3.7.1.min.js"></script>
+	<script src="js/bootstrap.bundle.min.js"></script>
+	<script src="js/toast.js"></script>
 </head>
 <body>
-<div class="d-flex" id="wrapper">
-	<!-- Sidebar -->
-	<div class="bg-light border-right" id="sidebar-wrapper">
-		<div class="sidebar-heading">&nbsp;</div>
-		<div class="list-group list-group-flush">
-			<a href="index.html" class="list-group-item list-group-item-action">Video</a>
-			<a href="mqtt.html" class="list-group-item list-group-item-action active">MQTT</a>
-			<a href="test.html" class="list-group-item list-group-item-action">Test</a>
-			<a href="about.html" class="list-group-item list-group-item-action">About</a>
+	<header class="app-header">
+		<div class="app-name" id="app-name">&nbsp;</div>
+		<nav class="nav-bar">
+			<a href="index.html">Video</a>
+			<a href="mqtt.html" class="active">MQTT</a>
+			<a href="about.html">About</a>
+		</nav>
+	</header>
+
+	<div class="page-content">
+		<div class="row">
+			<div class="col-xxl-4 col-xl-6 mb-4">
+				<div class="card">
+					<div class="card-body">
+						<h3 class="card-title">MQTT Connection</h3>
+
+						<div class="form-group">
+							<label for="mqtt_status">Status</label>
+							<input id="mqtt_status" type="text" readonly class="form-control-plaintext" value="Status">
+						</div>
+
+						<div class="form-group">
+							<label for="mqtt_address">Address</label>
+							<input id="mqtt_address" type="text" class="form-control">
+						</div>
+
+						<div class="form-group">
+							<label for="mqtt_port">Port</label>
+							<input id="mqtt_port" type="text" class="form-control">
+						</div>
+
+						<div class="form-group">
+							<label for="mqtt_user">User</label>
+							<input type="text" class="form-control" id="mqtt_user">
+						</div>
+
+						<div class="form-group">
+							<label for="mqtt_password">Password</label>
+							<input type="password" class="form-control" id="mqtt_password">
+						</div>
+
+						<div class="form-group">
+							<label for="mqtt_preTopic">Pre-topic</label>
+							<input id="mqtt_preTopic" type="text" class="form-control">
+						</div>
+
+						<div class="form-group">
+							<label for="mqtt_tls">TLS</label>
+							<div class="input-wrapper">
+								<select id="mqtt_tls" class="form-control">
+									<option value="none">No TLS</option>
+									<option value="verify">Verify certificate</option>
+									<option value="noverify">Trust certificate</option>
+								</select>
+								<a href="certificate.html" class="cert-link">Set certificates (if required)</a>
+							</div>
+						</div>
+
+						<div class="form-group">
+							<div class="button-container">
+								<button id="connect" class="btn btn-primary">Connect</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<div class="col-xxl-4 col-xl-6 mb-4">
+				<div class="card">
+					<div class="card-body">
+						<h3 class="card-title">System Payload Properties</h3>
+						<p class="card-text">Additional properties can help a system with multiple devices.</p>
+						<p class="card-text">Name is typically some sort of system device identifier.<br/></p>
+						<p class="card-text">Location is typically a human readable location identifier such as City, Building, Address or network location such IP address or FQDN</p>
+						<p class="card-text">These values may be left blank when not used</p>
+
+						<div class="form-group">
+							<label for="payload_name">Name</label>
+							<input id="payload_name" type="text" class="form-control">
+						</div>
+
+						<div class="form-group">
+							<label for="payload_location">Location</label>
+							<input id="payload_location" type="text" class="form-control">
+						</div>
+
+						<div class="form-group">
+							<div class="button-container">
+								<button id="update_payload" class="btn btn-primary">Update</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
 		</div>
 	</div>
-	
-    <div id="page-content-wrapper" class="p-0">
-        <div class="container-fluid">
-            <div class="row mt-3">
-                <div class="col-xxl-4 col-xl-6 mb-4">
-                    <div class="card">
-                        <div class="card-body">
-                            <h3 class="card-title">MQTT Connection</h3>
-                            
-                            <div class="form-group">
-                                <label for="mqtt_status">Status</label>
-                                <input id="mqtt_status" type="text" readonly class="form-control-plaintext" value="Status">
-                            </div>
-
-                            <div class="form-group">
-                                <label for="mqtt_address">Address</label>
-                                <input id="mqtt_address" type="text" class="form-control">
-                            </div>
-
-                            <div class="form-group">
-                                <label for="mqtt_port">Port</label>
-                                <input id="mqtt_port" type="text" class="form-control">
-                            </div>
-
-                            <div class="form-group">
-                                <label for="mqtt_user">User</label>
-                                <input type="text" class="form-control" id="mqtt_user">
-                            </div>
-
-                            <div class="form-group">
-                                <label for="mqtt_password">Password</label>
-                                <input type="password" class="form-control" id="mqtt_password">
-                            </div>
-
-                            <div class="form-group">
-                                <label for="mqtt_preTopic">Pre-topic</label>
-                                <input id="mqtt_preTopic" type="text" class="form-control">
-                            </div>
-
-                            <div class="form-group">
-                                <label for="mqtt_tls">TLS</label>
-                                <div class="input-wrapper">
-                                    <select id="mqtt_tls" class="form-control">
-                                        <option value="none">No TLS</option>
-                                        <option value="verify">Verify certificate</option>
-                                        <option value="noverify">Trust certificate</option>
-                                    </select>
-                                    <a href="certificate.html" class="cert-link">Set certificates (if required)</a>
-                                </div>
-                            </div>
-
-                            <div class="form-group">
-                                <div class="button-container">
-                                    <button id="connect" class="btn btn-primary">Connect</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-xxl-4 col-xl-6 mb-4">
-                    <div class="card">
-                        <div class="card-body">
-                            <h3 class="card-title">System Payload Properties</h3>
-                            <p class="card-text">Additional properties can help a system with multiple devices.</p>
-                            <p class="card-text">Name is typically some sort of system device identifier.<br/></p>
-                            <p class="card-text">Location is typically a human readable location identifier such as City, Building, Address or network location such IP address or FQDN</p>
-                            <p class="card-text">These values may be left blank when not used</p>
-                            
-                            <div class="form-group">
-                                <label for="payload_name">Name</label>
-                                <input id="payload_name" type="text" class="form-control">
-                            </div>
-
-                            <div class="form-group">
-                                <label for="payload_location">Location</label>
-                                <input id="payload_location" type="text" class="form-control">
-                            </div>
-
-                            <div class="form-group">
-                                <div class="button-container">
-                                    <button id="update_payload" class="btn btn-primary">Update</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-	<div class="toast-container position-fixed top-0 end-0 p-3">
-	</div>
-</div>
 
 <script>
 let MQTT_Client = 0;
@@ -129,7 +122,7 @@ $(document).ready(function() {
 		success: function(data) {
 			app = data;
 			document.title = app.manifest.acapPackageConf.setup.friendlyName;
-			$('.sidebar-heading').text(app.manifest.acapPackageConf.setup.friendlyName);
+			$('#app-name').text(app.manifest.acapPackageConf.setup.friendlyName);
 			$("#mqtt_status").val(app.status.mqtt.status);
 			updateButtonState(app.status.mqtt);
 		},
@@ -138,12 +131,12 @@ $(document).ready(function() {
 		}
 	});
 
-    $.ajax({
-        type: "GET",
-        url: 'mqtt',
-        dataType: 'json',
-        cache: false,
-        success: function(mqtt) {
+	$.ajax({
+		type: "GET",
+		url: 'mqtt',
+		dataType: 'json',
+		cache: false,
+		success: function(mqtt) {
 			$('#mqtt_address').val(mqtt.address);
 			$('#mqtt_port').val(mqtt.port);
 			$('#mqtt_user').val(mqtt.user);
@@ -154,18 +147,17 @@ $(document).ready(function() {
 			if( mqtt.tls === false ) {
 				$("#mqtt_tls").val("none");
 			} else {
-				if( mqtt.validate )
+				if( mqtt.verify )
 					$("#mqtt_tls").val("verify");
 				else
 					$("#mqtt_tls").val("noverify");
 			}
-        },
-        error: function(response) {
+		},
+		error: function(response) {
 			showToast("No MQTT settings",'warning');
-        }
-    });
+		}
+	});
 
-    // Status polling interval
 	setInterval(function() {
 		$.ajax({
 			type: "GET",
@@ -173,15 +165,14 @@ $(document).ready(function() {
 			dataType: 'json',
 			cache: false,
 			success: function(data) {
-				// Update status text
 				$("#mqtt_status").val(data.mqtt.status);
 				updateButtonState(data.mqtt);
 			},
 			error: function(data) {
 				console.error("Failed to fetch status:", data);
 			}
-        });
-    }, 2000);
+		});
+	}, 2000);
 
 });
 
@@ -195,23 +186,19 @@ function onFailure(message) {
 }
 
 function onConnectionLost(message) {
-  if (message.errorCode !== 0) {
-	showToast("Web page lost connection. " + message.errorMessage,"warning");
-  }
+	if (message.errorCode !== 0) {
+		showToast("Web page lost connection. " + message.errorMessage,"warning");
+	}
 }
 
-// Function to update button state
 function updateButtonState(mqtt) {
 	const button = $("#connect");
-	
 	if (mqtt.connected) {
-		// Connected state - show disconnect button
 		button.text("Disconnect")
 			 .removeClass("btn-primary btn-secondary")
 			 .addClass("btn-danger")
 			 .prop("disabled", false);
 	} else {
-		// Disconnected state - show connect button
 		button.text("Connect")
 			 .removeClass("btn-danger btn-secondary")
 			 .addClass("btn-primary")
@@ -219,18 +206,9 @@ function updateButtonState(mqtt) {
 	}
 }
 
-// Menu toggle handler
-$("#menu-toggle").click(function(e) {
-	e.preventDefault();
-	$("#wrapper").toggleClass("toggled");
-});
-
-// Connect button click handler
 $("#connect").click(function() {
 	const button = $(this);
 	const isConnected = button.hasClass("btn-danger");
-	
-	// Disable button during ajax call
 	button.prop("disabled", true);
 
 	if( isConnected ) {
@@ -239,7 +217,6 @@ $("#connect").click(function() {
 			url: 'mqtt?action=disconnect',
 			dataType: 'text',
 			success: function(response) {
-				// Button state will be updated by the status polling
 			},
 			error: function(response) {
 				showToast("Failed to disconnect","warning");
@@ -262,7 +239,6 @@ $("#connect").click(function() {
 			settings.tls = true;
 			settings.verify = true;
 		}
-		
 		if(tlsMode === "noverify" ) {
 			settings.tls = true;
 			settings.verify = false;
@@ -274,7 +250,6 @@ $("#connect").click(function() {
 			dataType: 'text',
 			success: function(response) {
 				showToast("Updated and connected","success");
-				// Button state will be updated by the status polling
 			},
 			error: function(response) {
 				if( settings.tls === true && settings.verify === true ) {
@@ -296,7 +271,6 @@ $("#update_payload").click(function() {
 			location: $('#payload_location').val()
 		}
 	};
-	
 	$.ajax({
 		type: "GET",
 		url: 'mqtt?json=' + encodeURI(JSON.stringify(settings)),
@@ -310,36 +284,6 @@ $("#update_payload").click(function() {
 		}
 	});
 });
-
-function showToast(message, type = 'danger') {
-    const toastContainer = document.querySelector('.toast-container');
-    
-    // Determine text color class based on type
-    const textColorClass = type === 'warning' ? 'text-dark' : 'text-white';
-    
-    // Create the toast HTML structure
-    var toastHtml = '';
-    toastHtml += '<div class="toast align-items-center ' + textColorClass + ' bg-' + type + ' border-0" role="alert" aria-live="assertive" aria-atomic="true">';
-    toastHtml += '   <div class="d-flex">';
-    toastHtml += '     <div class="toast-body">' + message + '</div>';
-    toastHtml += '     <button type="button" class="btn-close' + (type === 'warning' ? '' : ' btn-close-white') + ' me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>';
-    toastHtml += '   </div>';
-    toastHtml += '</div>';
-    
-    // Rest of the function remains the same
-    toastContainer.insertAdjacentHTML('beforeend', toastHtml);
-    const toastElement = toastContainer.lastElementChild;
-    const toast = new bootstrap.Toast(toastElement, {
-        autohide: true,
-        delay: 10000
-    });
-    toast.show();
-    toastElement.addEventListener('hidden.bs.toast', function() {
-        this.remove();
-    });
-}
-	
 </script>
 </body>
-
 </html>

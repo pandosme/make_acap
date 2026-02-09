@@ -139,85 +139,94 @@ CERTS_HTTP (const  ACAP_HTTP_Response response,const  ACAP_HTTP_Request request)
 
 	if(!type) {
 		LOG_WARN("CERT: Type is missing\n");
-		 ACAP_HTTP_Respond_Error( response, 400, "Missing type" );
+		ACAP_HTTP_Respond_Error( response, 400, "Missing type" );
+		cJSON_Delete(data);
 		return;
 	}
-	
+
 	if(!pem) {
 		LOG_WARN("CERT: PEM is missing\n");
-		 ACAP_HTTP_Respond_Error( response, 400, "Missing pem" );
+		ACAP_HTTP_Respond_Error( response, 400, "Missing pem" );
+		cJSON_Delete(data);
 		return;
 	}
 
 	if( !(strcmp(type,"ca")==0 || strcmp(type,"cert")==0 || strcmp(type,"key")==0) ) {
 		LOG_WARN("CERTS: Invalid type %s\n", type);
-		 ACAP_HTTP_Respond_Error( response, 400, "Missing type" );
+		ACAP_HTTP_Respond_Error( response, 400, "Invalid type" );
+		cJSON_Delete(data);
 		return;
 	}
 
 	if( strcmp(type,"ca") == 0 ) {
 		if( strlen(pem) < 500 ) {
 			if( !cJSON_GetObjectItem(CERTS_SETTINGS,"cafile") ) {
-				 ACAP_HTTP_Respond_Text(response,"OK");
+				ACAP_HTTP_Respond_Text(response,"OK");
+				cJSON_Delete(data);
 				return;
 			}
-			if(  ACAP_FILE_Delete( "localdata/ca.pem" ) ) {
+			if( ACAP_FILE_Delete( "localdata/ca.pem" ) ) {
 				cJSON_DeleteItemFromObject(CERTS_SETTINGS,"cafile");
-				 ACAP_STATUS_SetBool("certificate","CA",0);
-				 ACAP_HTTP_Respond_Text(response,"OK");
+				ACAP_STATUS_SetBool("certificate","ca",0);
+				ACAP_HTTP_Respond_Text(response,"OK");
 			} else {
 				LOG_WARN("Unable to remove CA file\n");
-				 ACAP_HTTP_Respond_Error(response,500,"Failed to remove");
-				return;
+				ACAP_HTTP_Respond_Error(response,500,"Failed to remove");
 			}
+			cJSON_Delete(data);
+			return;
 		}
 	}
 
 	if( strcmp(type,"cert") == 0 ) {
 		if( strlen(pem) < 500 ) {
 			if( !cJSON_GetObjectItem(CERTS_SETTINGS,"certfile") ) {
-				 ACAP_HTTP_Respond_Text(response,"OK");
+				ACAP_HTTP_Respond_Text(response,"OK");
+				cJSON_Delete(data);
 				return;
 			}
-			if(  ACAP_FILE_Delete( "localdata/cert.pem" ) ) {
+			if( ACAP_FILE_Delete( "localdata/cert.pem" ) ) {
 				cJSON_DeleteItemFromObject(CERTS_SETTINGS,"certfile");
-				if(  ACAP_FILE_Delete( "localdata/key.pem" ) ) {
+				if( ACAP_FILE_Delete( "localdata/key.pem" ) ) {
 					cJSON_DeleteItemFromObject(CERTS_SETTINGS,"keyfile");
 					if( cJSON_GetObjectItem(CERTS_SETTINGS,"password") ) {
-						 ACAP_FILE_Delete( "localdata/ph.txt" );
+						ACAP_FILE_Delete( "localdata/ph.txt" );
 						cJSON_DeleteItemFromObject(CERTS_SETTINGS,"password");
 					}
-				}				
-				 ACAP_STATUS_SetBool("certificate","cert", 0);
-				 ACAP_HTTP_Respond_Text(response,"OK");
+				}
+				ACAP_STATUS_SetBool("certificate","cert", 0);
+				ACAP_HTTP_Respond_Text(response,"OK");
 			} else {
 				LOG_WARN("Unable to remove certificate file\n");
-				 ACAP_HTTP_Respond_Error(response,500,"Failed to remove");
-				return;
+				ACAP_HTTP_Respond_Error(response,500,"Failed to remove");
 			}
+			cJSON_Delete(data);
+			return;
 		}
 	}
 
 	if( strcmp(type,"key")==0 ) {
 		if( strlen(pem) < 500 ) {
 			if( !cJSON_GetObjectItem(CERTS_SETTINGS,"keyfile") ) {
-				 ACAP_HTTP_Respond_Text(response,"OK");
+				ACAP_HTTP_Respond_Text(response,"OK");
+				cJSON_Delete(data);
 				return;
 			}
-			if(  ACAP_FILE_Delete( "localdata/key.pem" ) ) {
-				 ACAP_FILE_Delete( "localdata/ph.txt" );
+			if( ACAP_FILE_Delete( "localdata/key.pem" ) ) {
+				ACAP_FILE_Delete( "localdata/ph.txt" );
 				cJSON_DeleteItemFromObject(CERTS_SETTINGS,"keyfile");
 				if( cJSON_GetObjectItem(CERTS_SETTINGS,"password" ) ) {
 					cJSON_DeleteItemFromObject(CERTS_SETTINGS,"password");
-					 ACAP_STATUS_SetBool("certificate","password",0);
+					ACAP_STATUS_SetBool("certificate","password",0);
 				}
-				 ACAP_STATUS_SetBool("certificate","key",0);
-				 ACAP_HTTP_Respond_Text(response,"OK");
+				ACAP_STATUS_SetBool("certificate","key",0);
+				ACAP_HTTP_Respond_Text(response,"OK");
 			} else {
 				LOG_WARN("Unable to remove key file\n");
-				 ACAP_HTTP_Respond_Error(response,500,"Failed to remove");
-				return;
+				ACAP_HTTP_Respond_Error(response,500,"Failed to remove");
 			}
+			cJSON_Delete(data);
+			return;
 		}
 	}
 	
@@ -239,7 +248,8 @@ CERTS_HTTP (const  ACAP_HTTP_Response response,const  ACAP_HTTP_Request request)
 
 	if( length < 1 ) {
 		LOG_WARN("CERTS: Could not save cert data\n");
-		 ACAP_HTTP_Respond_Error( response, 500, "Failed saving data" );
+		ACAP_HTTP_Respond_Error( response, 500, "Failed saving data" );
+		cJSON_Delete(data);
 		return;
 	} else {
 		LOG_TRACE("%s: Data saveed in %s\n",__func__,filepath);
@@ -290,7 +300,8 @@ CERTS_HTTP (const  ACAP_HTTP_Response response,const  ACAP_HTTP_Request request)
 			cJSON_AddStringToObject(CERTS_SETTINGS,"cafile",fullpath);
 		 ACAP_STATUS_SetBool("certificate","ca",1);
 	}
-	 ACAP_HTTP_Respond_Text( response, "OK" );
+	ACAP_HTTP_Respond_Text( response, "OK" );
+	cJSON_Delete(data);
 }
 
 int
@@ -322,12 +333,13 @@ CERTS_Init(){
 			rewind(file);
 			length = fread ( buffer, sizeof(char), lSize, file );
 			if( length > 50 ) {
-				if( strstr( buffer, "-----BEGIN CERTIFICATE-----") > 0 ) {
+				buffer[length] = '\0';
+				if( strstr( buffer, "-----BEGIN CERTIFICATE-----") != NULL ) {
 					char filepath[256];
 					sprintf(filepath,"%s%s", ACAP_FILE_AppPath(),"localdata/cert.pem");
 					cJSON_AddStringToObject(CERTS_SETTINGS, "certfile", filepath );
 					LOG_TRACE("%s: Client certificate loaded\n", __func__);
-					 ACAP_STATUS_SetBool("certificate","cert",0);
+					 ACAP_STATUS_SetBool("certificate","cert",1);
 				} else {
 					LOG_WARN("Could not load certificate file.  File corrupt or empty\n");
 				}
@@ -358,6 +370,7 @@ CERTS_Init(){
 			rewind(file);
 			length = fread ( buffer, sizeof(char), lSize, file );
 			if( length > 50 ) {
+				buffer[length] = '\0';
 				char filepath[256];
 				sprintf(filepath,"%s%s", ACAP_FILE_AppPath(),"localdata/key.pem");
 				cJSON_AddStringToObject(CERTS_SETTINGS, "keyfile", filepath );
@@ -390,7 +403,8 @@ CERTS_Init(){
 			rewind(file);
 			length = fread ( buffer, sizeof(char), lSize, file );
 			if( length > 50 ) {
-				if( strstr( buffer, "-----BEGIN CERTIFICATE-----") > 0 ) {
+				buffer[length] = '\0';
+				if( strstr( buffer, "-----BEGIN CERTIFICATE-----") != NULL ) {
 					char filepath[256];
 					sprintf(filepath,"%s%s", ACAP_FILE_AppPath(),"localdata/ca.pem");
 					cJSON_AddStringToObject(CERTS_SETTINGS, "cafile", filepath );
@@ -426,6 +440,7 @@ CERTS_Init(){
 			rewind(file);
 			length = fread ( buffer, sizeof(char), lSize, file );
 			if( length > 3 ) {
+				buffer[length] = '\0';
 				cJSON_AddStringToObject(CERTS_SETTINGS, "password", buffer );
 				 ACAP_STATUS_SetBool("certificate","password",0);
 			} else {

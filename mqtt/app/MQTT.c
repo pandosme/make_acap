@@ -390,7 +390,7 @@ MQTT_Publish_JSON(const char *topic, cJSON *payload, int qos, int retained) {
         if(name_item && name_item->valuestring && strlen(name_item->valuestring)) {
             cJSON_AddStringToObject(publish, "name", name_item->valuestring);
         }
-        if(location_item && location_item->valuestring && strlen(name_item->valuestring)) {
+        if(location_item && location_item->valuestring && strlen(location_item->valuestring)) {
             cJSON_AddStringToObject(publish, "location", location_item->valuestring);
         }
     }
@@ -452,7 +452,10 @@ MQTT_Publish_Binary(const char *topic, int payloadlen, void *payload, int qos, i
     opts.context = mqtt_client;
    
     int rc = mqtt.sendMessage(mqtt_client, fullTopic, &pubmsg, &opts);
-    
+
+    if (fullTopic != topic)
+        free(fullTopic);
+
     return (rc == MQTTASYNC_SUCCESS);
 }
 
@@ -569,7 +572,6 @@ static void connectionLost(void* context, char* cause) {
 
 static int
 messageArrived(void* context, char* topicName, int topicLen, MQTTAsync_message* message) {
-/*	
     if (userSubscriptionCallback) {
         // Create null-terminated copy for callback
         char *payload = malloc(message->payloadlen + 1);
@@ -577,13 +579,12 @@ messageArrived(void* context, char* topicName, int topicLen, MQTTAsync_message* 
             memcpy(payload, message->payload, message->payloadlen);
             payload[message->payloadlen] = '\0';
             userSubscriptionCallback(topicName, payload);
-            free(payload);  // Free our copy, not the original
+            free(payload);
         }
     }
-    
-    mqtt.freeMessage(&message);  // Proper cleanup
+
+    mqtt.freeMessage(&message);
     mqtt.free(topicName);
-*/	
     return 1;
 }
 
@@ -732,25 +733,30 @@ MQTT_HTTP_callback(const ACAP_HTTP_Response response, const ACAP_HTTP_Request re
 
     if (action && strcmp(action, "disconnect") == 0) {
         if (connectionCallback) connectionCallback(MQTT_DISCONNECTING);
-        
+
         if (MQTT_Disconnect()) {
-            cJSON_GetObjectItem(MQTTSettings, "connect")->type = cJSON_False;
+            cJSON_ReplaceItemInObject(MQTTSettings, "connect", cJSON_CreateFalse());
             ACAP_FILE_Write("localdata/mqtt.json", MQTTSettings);
             ACAP_HTTP_Respond_Text(response, "Disconnected");
         } else {
             ACAP_HTTP_Respond_Error(response, 500, "Disconnect failed");
         }
+        free((void*)action);
+        free((void*)json);
         pthread_mutex_unlock(&config_mutex);
         return;
     }
 
     if (!json) {
         ACAP_HTTP_Respond_JSON(response, MQTTSettings);
+        free((void*)action);
         pthread_mutex_unlock(&config_mutex);
         return;
     }
 
     cJSON *new_settings = cJSON_Parse(json);
+    free((void*)action);
+    free((void*)json);
     if (!new_settings) {
         ACAP_HTTP_Respond_Error(response, 400, "Invalid JSON");
         pthread_mutex_unlock(&config_mutex);

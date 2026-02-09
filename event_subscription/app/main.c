@@ -12,8 +12,8 @@
 
 #define LOG(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args);}
 #define LOG_WARN(fmt, args...)    { syslog(LOG_WARNING, fmt, ## args); printf(fmt, ## args);}
-#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
-//#define LOG_TRACE(fmt, args...)    {}
+//#define LOG_TRACE(fmt, args...)    { syslog(LOG_INFO, fmt, ## args); printf(fmt, ## args); }
+#define LOG_TRACE(fmt, args...)    {}
 
 void
 My_Event_Callback(cJSON *event, void* userdata) {
@@ -64,6 +64,10 @@ int main(void) {
 	
     g_main_loop_run(main_loop);
 	LOG("Terminating and cleaning up %s\n",APP_PACKAGE);
+    if (eventSubscriptions) {
+        cJSON_Delete(eventSubscriptions);
+        eventSubscriptions = NULL;
+    }
     ACAP_Cleanup();
 	closelog();
 	return 0;
