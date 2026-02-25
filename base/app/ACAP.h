@@ -2,12 +2,12 @@
  * ACAP SDK wrapper for version 12
  * Copyright (c) 2025 Fred Juhlin
  * MIT License - See LICENSE file for details
- * Version 3.7
- * 
+ * Version 4.0
+ *
  * This header provides a simplified wrapper around the AXIS ACAP SDK,
  * offering easy-to-use interfaces for HTTP handling, event management,
  * device information, file operations, status management, and VAPIX API access.
- * 
+ *
  * MEMORY OWNERSHIP CONVENTIONS:
  * - Functions returning cJSON* from ACAP_Get_Config(), ACAP_STATUS_*() getters,
  *   and ACAP_DEVICE_*() return pointers to internally managed objects.
@@ -23,8 +23,8 @@
 #ifndef _ACAP_H_
 #define _ACAP_H_
 
+#include <stdio.h>
 #include <glib.h>
-#include "fcgi_stdio.h"
 #include "cJSON.h"
 
 #ifdef __cplusplus
@@ -34,35 +34,30 @@ extern "C" {
 /*-----------------------------------------------------
  * Constants
  *-----------------------------------------------------*/
-#define ACAP_MAX_HTTP_NODES 32      /**< Maximum number of HTTP endpoint handlers */
-#define ACAP_MAX_PATH_LENGTH 128    /**< Maximum file path length */
-#define ACAP_MAX_PACKAGE_NAME 30    /**< Maximum ACAP package name length */
-#define ACAP_MAX_BUFFER_SIZE 4096   /**< Maximum buffer size for HTTP POST data */
+#define ACAP_VERSION        "4.0.0"     /**< ACAP wrapper version string */
+#define ACAP_MAX_HTTP_NODES 32          /**< Maximum number of HTTP endpoint handlers */
+#define ACAP_MAX_PATH_LENGTH 128        /**< Maximum file path length */
+#define ACAP_MAX_PACKAGE_NAME 30        /**< Maximum ACAP package name length */
+#define ACAP_MAX_BUFFER_SIZE 4096       /**< Maximum buffer size for HTTP POST data */
 
 /*-----------------------------------------------------
- * Return Types
+ * Opaque HTTP Types
+ *
+ * HTTP request and response objects are opaque pointers.
+ * Use the ACAP_HTTP_* accessor functions to interact with them.
  *-----------------------------------------------------*/
-/**
- * @brief ACAP operation status codes
- */
-typedef enum {
-    ACAP_SUCCESS = 0,        /**< Operation completed successfully */
-    ACAP_ERROR_INIT = -1,    /**< Initialization error */
-    ACAP_ERROR_PARAM = -2,   /**< Invalid parameter */
-    ACAP_ERROR_MEMORY = -3,  /**< Memory allocation error */
-    ACAP_ERROR_IO = -4,      /**< I/O error */
-    ACAP_ERROR_HTTP = -5     /**< HTTP error */
-} ACAP_Status;
+typedef struct ACAP_HTTP_Request_T*  ACAP_HTTP_Request;
+typedef struct ACAP_HTTP_Response_T* ACAP_HTTP_Response;
 
 /*-----------------------------------------------------
- * Core Types and Structures
+ * Callback Types
  *-----------------------------------------------------*/
 
 /**
  * @brief Callback function type for configuration updates.
  * @param service The name of the service/setting that was updated (e.g., "publish", "scene")
  * @param data The updated configuration data (internally managed, do not delete)
- * 
+ *
  * Called when settings are modified via HTTP POST to /local/<package>/settings
  * or during initialization for each setting in settings.json.
  */
@@ -76,21 +71,6 @@ typedef void (*ACAP_Config_Update)(const char* service, cJSON* data);
 typedef void (*ACAP_EVENTS_Callback)(cJSON* event, void* user_data);
 
 /**
- * @brief HTTP Request data structure containing parsed request information.
- */
-typedef struct {
-    FCGX_Request* request;      /**< Underlying FastCGI request handle */
-    const char* postData;       /**< POST body data (NULL for GET requests) */
-    size_t postDataLength;      /**< Length of POST data in bytes */
-    const char* method;         /**< HTTP method: "GET", "POST", etc. */
-    const char* contentType;    /**< Content-Type header value */
-    const char* queryString;    /**< Raw query string from URL */
-} ACAP_HTTP_Request_DATA;
-
-typedef ACAP_HTTP_Request_DATA* ACAP_HTTP_Request;
-typedef FCGX_Request* ACAP_HTTP_Response;
-
-/**
  * @brief HTTP endpoint callback function type.
  * @param response The response object to write data to
  * @param request The request object containing method, params, and POST data
@@ -102,20 +82,26 @@ typedef void (*ACAP_HTTP_Callback)(ACAP_HTTP_Response response, const ACAP_HTTP_
  *=====================================================*/
 
 /**
+ * @brief Get the ACAP wrapper version string.
+ * @return Version string (e.g., "4.0.0"). Do NOT free.
+ */
+const char* ACAP_Version(void);
+
+/**
  * @brief Initialize the ACAP framework.
- * 
+ *
  * This function MUST be called first before any other ACAP functions.
  * It initializes file system paths, loads manifest.json and settings,
  * starts the HTTP server thread, and sets up event handling.
- * 
+ *
  * @param package The ACAP package name (must match manifest.json appName)
  * @param updateCallback Optional callback invoked when settings change (can be NULL)
  * @return Pointer to the settings cJSON object (internally managed, do NOT delete).
  *         Returns NULL on initialization failure.
- * 
+ *
  * @note The callback is invoked for each setting during initialization and
  *       whenever settings are updated via HTTP POST.
- * 
+ *
  * Example:
  * @code
  * void onSettingsUpdate(const char* service, cJSON* data) {
@@ -123,9 +109,9 @@ typedef void (*ACAP_HTTP_Callback)(ACAP_HTTP_Response response, const ACAP_HTTP_
  *         // Handle publish settings change
  *     }
  * }
- * 
+ *
  * int main(void) {
- *     cJSON* settings = ACAP("MyApp", onSettingsUpdate);
+ *     cJSON* settings = ACAP_Init("MyApp", onSettingsUpdate);
  *     if (!settings) return 1;
  *     // ... application code ...
  *     ACAP_Cleanup();
@@ -133,7 +119,7 @@ typedef void (*ACAP_HTTP_Callback)(ACAP_HTTP_Response response, const ACAP_HTTP_
  * }
  * @endcode
  */
-cJSON* ACAP(const char* package, ACAP_Config_Update updateCallback);
+cJSON* ACAP_Init(const char* package, ACAP_Config_Update updateCallback);
 
 /**
  * @brief Get the ACAP package name.
@@ -143,28 +129,28 @@ const char* ACAP_Name(void);
 
 /**
  * @brief Register a configuration object for a service.
- * 
+ *
  * Adds a cJSON object to the global app configuration, making it
  * accessible via ACAP_Get_Config() and the /local/<package>/app HTTP endpoint.
- * 
+ *
  * @param service The service name (e.g., "mqtt", "status")
  * @param serviceSettings The cJSON object to register (ownership transfers to ACAP)
  * @return 1 on success, 1 if already registered (no-op)
- * 
+ *
  * @note Once registered, the object should NOT be deleted by the caller.
  */
 int ACAP_Set_Config(const char* service, cJSON* serviceSettings);
 
 /**
  * @brief Retrieve a registered configuration object.
- * 
+ *
  * @param service The service name to retrieve (e.g., "settings", "mqtt", "device")
  * @return Pointer to the cJSON object, or NULL if not found.
- * 
+ *
  * @warning DO NOT call cJSON_Delete() on the returned pointer.
  *          The object is managed internally and persists for the application lifetime.
  *          If you need to modify a copy, use cJSON_Duplicate() first.
- * 
+ *
  * Common service names:
  * - "settings" - Application settings from settings/settings.json
  * - "manifest" - Package manifest.json
@@ -176,12 +162,12 @@ cJSON* ACAP_Get_Config(const char* service);
 
 /**
  * @brief Clean up all ACAP resources and stop background threads.
- * 
+ *
  * Call this before application exit to properly release resources:
  * - Stops HTTP server thread
  * - Frees all cJSON configuration objects
  * - Cleans up event handlers
- * 
+ *
  * After calling this function, no other ACAP functions should be called.
  */
 void ACAP_Cleanup(void);
@@ -192,14 +178,14 @@ void ACAP_Cleanup(void);
 
 /**
  * @brief Register an HTTP endpoint handler.
- * 
+ *
  * Creates an HTTP endpoint at /local/<package>/<nodename> that will
  * invoke the callback when accessed.
- * 
+ *
  * @param nodename The endpoint path (without /local/<package>/ prefix)
  * @param callback The function to handle requests to this endpoint
  * @return 1 on success, 0 on failure (max nodes reached or duplicate path)
- * 
+ *
  * Example:
  * @code
  * void my_handler(ACAP_HTTP_Response response, ACAP_HTTP_Request request) {
@@ -211,7 +197,7 @@ void ACAP_Cleanup(void);
  *         cJSON_Delete(data);
  *     }
  * }
- * 
+ *
  * ACAP_HTTP_Node("myendpoint", my_handler);
  * // Accessible at: http://camera/local/MyApp/myendpoint
  * @endcode
@@ -240,27 +226,41 @@ const char* ACAP_HTTP_Get_Content_Type(const ACAP_HTTP_Request request);
 size_t ACAP_HTTP_Get_Content_Length(const ACAP_HTTP_Request request);
 
 /**
+ * @brief Get the raw POST body data.
+ * @param request The HTTP request object
+ * @return Pointer to the body data (internally managed, do NOT free), or NULL
+ */
+const char* ACAP_HTTP_Get_Body(const ACAP_HTTP_Request request);
+
+/**
+ * @brief Get the length of the POST body data.
+ * @param request The HTTP request object
+ * @return Body length in bytes, or 0 if no body
+ */
+size_t ACAP_HTTP_Get_Body_Length(const ACAP_HTTP_Request request);
+
+/**
  * @brief Get a query string or form parameter value.
- * 
+ *
  * Searches for the parameter in POST form data first (for application/x-www-form-urlencoded),
  * then falls back to URL query string.
- * 
+ *
  * @param request The HTTP request object
  * @param param The parameter name to retrieve
  * @return The URL-decoded parameter value, or NULL if not found.
- * 
+ *
  * @warning The returned string is dynamically allocated. Caller MUST free() it.
- * 
+ *
  * Example:
  * @code
- * char* value = (char*)ACAP_HTTP_Request_Param(request, "id");
+ * char* value = ACAP_HTTP_Request_Param(request, "id");
  * if (value) {
  *     // Use value...
  *     free(value);
  * }
  * @endcode
  */
-const char* ACAP_HTTP_Request_Param(const ACAP_HTTP_Request request, const char* param);
+char* ACAP_HTTP_Request_Param(const ACAP_HTTP_Request request, const char* param);
 
 /**
  * @brief Get a query parameter and parse it as JSON.
@@ -317,9 +317,9 @@ int ACAP_HTTP_Respond_String(ACAP_HTTP_Response response, const char* fmt, ...);
 
 /**
  * @brief Send a JSON object as the response body.
- * 
+ *
  * Automatically sets Content-Type: application/json header.
- * 
+ *
  * @param response The HTTP response object
  * @param object The cJSON object to serialize and send (not consumed, caller still owns it)
  * @return 1 on success, 0 on failure
@@ -346,9 +346,9 @@ int ACAP_HTTP_Respond_Error(ACAP_HTTP_Response response, int code, const char* m
 
 /**
  * @brief Send a plain text response.
- * 
+ *
  * Automatically sets Content-Type: text/plain header.
- * 
+ *
  * @param response The HTTP response object
  * @param message The text message to send
  * @return 1 on success, 0 on failure
@@ -361,21 +361,21 @@ int ACAP_HTTP_Respond_Text(ACAP_HTTP_Response response, const char* message);
 
 /**
  * @brief Declare a simple stateful or stateless event.
- * 
+ *
  * Creates an AXIS event under CameraApplicationPlatform/<AppName>/<Id>
- * 
+ *
  * @param Id Event identifier (used in topic)
  * @param NiceName Human-readable event name shown in camera UI
  * @param state 1 for stateful event (has state property), 0 for stateless (has value property)
  * @return Declaration ID on success, 0 on failure
- * 
+ *
  * Example:
  * @code
  * // Stateful event (can be high/low)
  * ACAP_EVENTS_Add_Event("motion", "Motion Detected", 1);
  * ACAP_EVENTS_Fire_State("motion", 1);  // Set high
  * ACAP_EVENTS_Fire_State("motion", 0);  // Set low
- * 
+ *
  * // Stateless event (pulse)
  * ACAP_EVENTS_Add_Event("trigger", "Trigger Pulse", 0);
  * ACAP_EVENTS_Fire("trigger");
@@ -385,9 +385,9 @@ int ACAP_EVENTS_Add_Event(const char* Id, const char* NiceName, int state);
 
 /**
  * @brief Declare an event from a JSON definition.
- * 
+ *
  * Allows declaring events with custom source and data properties.
- * 
+ *
  * @param event JSON object with event definition containing:
  *        - "id": Event identifier (required)
  *        - "name": Human-readable name
@@ -407,9 +407,9 @@ int ACAP_EVENTS_Remove_Event(const char* Id);
 
 /**
  * @brief Fire a stateful event (set state high or low).
- * 
+ *
  * Only fires if the state actually changes (debounced).
- * 
+ *
  * @param Id The event identifier
  * @param value 1 for high/active, 0 for low/inactive
  * @return 1 on success, 0 on failure
@@ -440,14 +440,14 @@ int ACAP_EVENTS_SetCallback(ACAP_EVENTS_Callback callback);
 
 /**
  * @brief Subscribe to an event.
- * 
+ *
  * @param eventDeclaration JSON object defining the event to subscribe to:
  *        - "name": Description (required)
  *        - "topic0": {"namespace": "value"} (required)
  *        - "topic1", "topic2", "topic3": Optional additional topic levels
  * @param user_data User context passed to callback (can be NULL)
  * @return Subscription ID on success, 0 on failure
- * 
+ *
  * Example subscription declaration:
  * @code
  * {
@@ -482,7 +482,7 @@ const char* ACAP_FILE_AppPath(void);
  * @param filepath Relative path within the app directory
  * @param mode fopen mode string ("r", "w", "rb", etc.)
  * @return FILE pointer on success, NULL on failure
- * 
+ *
  * @note Caller must fclose() the returned file handle.
  */
 FILE* ACAP_FILE_Open(const char* filepath, const char* mode);
@@ -498,7 +498,7 @@ int ACAP_FILE_Delete(const char* filepath);
  * @brief Read and parse a JSON file.
  * @param filepath Relative path to the JSON file
  * @return Parsed cJSON object on success, NULL on failure
- * 
+ *
  * @warning Caller MUST call cJSON_Delete() on the returned object.
  */
 cJSON* ACAP_FILE_Read(const char* filepath);
@@ -552,7 +552,7 @@ int ACAP_DEVICE_Set_Location(double lat, double lon);
 
 /**
  * @brief Get a device property as a string.
- * 
+ *
  * @param name Property name. Available properties:
  *        - "serial"   - Device serial number
  *        - "model"    - Product model number
@@ -629,16 +629,16 @@ double ACAP_DEVICE_CPU_Average(void);
 
 /**
  * @brief Get network transmit rate in Kbps.
- * 
+ *
  * Calculates the average outbound network throughput since last call.
- * 
+ *
  * @return Transmit rate in kilobits per second
  */
 double ACAP_DEVICE_Network_Average(void);
 
 /*=====================================================
  * STATUS MANAGEMENT
- * 
+ *
  * Runtime status values organized in groups. Status data is exposed
  * via the /local/<package>/status HTTP endpoint and can be used
  * for monitoring application state.
@@ -734,19 +734,19 @@ void ACAP_STATUS_SetNull(const char* group, const char* name);
 
 /*=====================================================
  * VAPIX API
- * 
+ *
  * Functions for making authenticated requests to the local
  * camera's VAPIX API endpoints.
  *=====================================================*/
 
 /**
  * @brief Make a GET request to a VAPIX endpoint.
- * 
+ *
  * @param request The VAPIX CGI path (without http://camera/axis-cgi/ prefix)
  * @return Response body as string on success, NULL on failure
- * 
+ *
  * @warning Caller MUST free() the returned string.
- * 
+ *
  * Example:
  * @code
  * char* response = ACAP_VAPIX_Get("param.cgi?action=list&group=root.Brand");
@@ -760,13 +760,13 @@ char* ACAP_VAPIX_Get(const char* request);
 
 /**
  * @brief Make a POST request to a VAPIX endpoint.
- * 
+ *
  * @param request The VAPIX CGI path
  * @param body The POST body content
  * @return Response body as string on success, NULL on failure
- * 
+ *
  * @warning Caller MUST free() the returned string.
- * 
+ *
  * Example:
  * @code
  * const char* json = "{\"apiVersion\":\"1.0\",\"method\":\"getSupportedVersions\"}";

@@ -1,0 +1,56 @@
+---
+description: How to declare, fire, and subscribe to events in ACAP
+globs: "**/events.json,**/subscriptions.json,**/main.c"
+alwaysApply: false
+---
+
+# Working with Events
+
+## Declaring Events (settings/events.json)
+```json
+[
+  { "id": "state",   "name": "My App: State",   "state": true,  "show": true, "data": [] },
+  { "id": "trigger", "name": "My App: Trigger", "state": false, "show": true, "data": [] }
+]
+```
+- `state: true` = stateful (on/off), `state: false` = stateless (fire-and-forget)
+- `id` is used in code to fire the event
+
+## Firing Events in Code
+```c
+ACAP_EVENTS_Fire_State("state", 1);   // stateful: 1=active, 0=inactive
+ACAP_EVENTS_Fire("trigger");          // stateless trigger
+```
+
+## Subscribing to Device Events (settings/subscriptions.json)
+```json
+[
+  { "name": "Virtual Input",
+    "topic0": {"tns1":"Device"},
+    "topic1": {"tnsaxis":"IO"},
+    "topic2": {"tnsaxis":"VirtualInput"} },
+  { "name": "Day/Night",
+    "topic0": {"tns1":"VideoSource"},
+    "topic1": {"tnsaxis":"DayNightVision"} }
+]
+```
+
+## Setting Up Subscriptions in main.c
+```c
+void My_Event_Callback(cJSON *event, void* userdata) {
+    char* json = cJSON_PrintUnformatted(event);
+    LOG("Event: %s\n", json);
+    free(json);
+}
+
+// In main():
+ACAP_EVENTS_SetCallback(My_Event_Callback);
+cJSON* subs = ACAP_FILE_Read("settings/subscriptions.json");
+for (cJSON* sub = subs ? subs->child : NULL; sub; sub = sub->next)
+    ACAP_EVENTS_Subscribe(sub, NULL);
+// Note: subs from ACAP_FILE_Read must be freed by caller
+// but keep alive while subscriptions are active
+```
+
+## Reference
+See doc/EVENTS.md for the complete catalog of Axis device events with namespaces and properties.

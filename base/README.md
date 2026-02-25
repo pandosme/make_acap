@@ -102,19 +102,20 @@ MIT
 
 ## 📚 Additional Resources
 
-- [Axis ACAP SDK Documentation](https://www.axis.com/developer-community)
-- [ACAP Developer Guide](https://developer.axis.com)
+- [Axis ACAP SDK Documentation](https://developer.axis.com/acap/api)
+- [ACAP Native SDK Examples](https://github.com/AxisCommunications/acap-native-sdk-examples)
 
 > **Note**: This template is designed to accelerate ACAP application development by providing a structured, feature-rich starting point.
 
-### 4.3.1	February 22, 2025
-- Bumbed ACAP.c to version 3.6
+## Version History
 
-### 4.3.0	December 20, 2024
-- Additional ACAP bindings
-	* ACAP_DEVICE_Longitude();
-	* ACAP_DEVICE_Latitude();
-	* ACAP_DEVICE_Set_Location( double lat, double lon);
-	* ACAP_VAPIX_Get(const char *request);
-	* ACAP_VAPIX_Post(const char *request, const char* body );
-- Removed all references to axParameter
+### 4.5.0
+- ACAP.h/ACAP.c updated to v4.0: opaque HTTP types, `ACAP_Init()`, body getters, `ACAP_Version()`
+- Makefile cleanup: correct PKGS (vdostream glib-2.0 gio-2.0 axevent fcgi libcurl)
+- main.c updated: v4.0 API, proper `free()` for `ACAP_HTTP_Request_Param()` results
+
+### 4.3.1
+- Bumped ACAP.c to version 3.6
+
+### 4.3.0
+- Added location/VAPIX APIs, removed axParameter references

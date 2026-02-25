@@ -41,7 +41,7 @@ int main(void) {
     LOG("------ Starting ACAP Service ------\n");
 
 	
-	ACAP( APP_PACKAGE, NULL );  //No configuration parameters
+	ACAP_Init( APP_PACKAGE, NULL );  //No configuration parameters
 
 	//Add Event subscriptions
 	ACAP_EVENTS_SetCallback( My_Event_Callback );

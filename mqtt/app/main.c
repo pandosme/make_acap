@@ -43,12 +43,14 @@ HTTP_ENDPOINT_Publish(ACAP_HTTP_Response response,const ACAP_HTTP_Request reques
 		return;
 	}
 
-	if (!request->postData || request->postDataLength == 0) {
+	const char* postBody = ACAP_HTTP_Get_Body(request);
+	size_t postBodyLen = ACAP_HTTP_Get_Body_Length(request);
+	if (!postBody || postBodyLen == 0) {
 		ACAP_HTTP_Respond_Error(response, 400, "Missing POST data");
 		return;
 	}
 
-	cJSON* body = cJSON_Parse(request->postData);
+	cJSON* body = cJSON_Parse(postBody);
 	if (!body) {
 		ACAP_HTTP_Respond_Error(response, 400, "Invalid JSON");
 		LOG_WARN("Unable to parse json for MQTT settings\n");
@@ -56,11 +58,13 @@ HTTP_ENDPOINT_Publish(ACAP_HTTP_Response response,const ACAP_HTTP_Request reques
 	}
 	const char* topic = cJSON_GetObjectItem(body,"topic")?cJSON_GetObjectItem(body,"topic")->valuestring:0;
 	if( !topic || strlen(topic) == 0) {
+		cJSON_Delete(body);
 		ACAP_HTTP_Respond_Error(response, 400, "Topic must be set");
 		return;
 	}
 	const char* payload = cJSON_GetObjectItem(body,"payload")?cJSON_GetObjectItem(body,"payload")->valuestring:0;
 	if( !payload ) {
+		cJSON_Delete(body);
 		ACAP_HTTP_Respond_Error(response, 400, "Payload must be set");
 		return;
 	}
@@ -132,7 +136,7 @@ main(void) {
 	openlog(APP_PACKAGE, LOG_PID|LOG_CONS, LOG_USER);
 	LOG("------ Starting ACAP Service ------\n");
 	
-	ACAP( APP_PACKAGE, Settings_Updated_Callback );
+	ACAP_Init( APP_PACKAGE, Settings_Updated_Callback );
 	ACAP_HTTP_Node("publish", HTTP_ENDPOINT_Publish );
 
     MQTT_Init(Main_MQTT_Status, Main_MQTT_Subscription_Message);

@@ -1,0 +1,60 @@
+---
+description: Memory ownership rules for ACAP C code
+globs: "**/*.c"
+alwaysApply: false
+---
+
+# Memory Ownership Rules
+
+## Internal Pointers — Do NOT Free
+These return pointers to internally managed data:
+```c
+cJSON* settings = ACAP_Get_Config("settings");     // DO NOT cJSON_Delete()
+cJSON* status   = ACAP_STATUS_Group("system");      // DO NOT cJSON_Delete()
+cJSON* device   = ACAP_DEVICE_JSON("resolutions");  // DO NOT cJSON_Delete()
+const char* method = ACAP_HTTP_Get_Method(request);  // DO NOT free()
+const char* body   = ACAP_HTTP_Get_Body(request);    // DO NOT free()
+```
+
+## Caller-Owned — MUST Free
+These allocate new memory that the caller must release:
+```c
+// ACAP_HTTP_Request_Param → char* → free()
+char* param = ACAP_HTTP_Request_Param(request, "key");
+// ... use param ...
+free(param);
+
+// ACAP_FILE_Read → cJSON* → cJSON_Delete()
+cJSON* data = ACAP_FILE_Read("settings/subscriptions.json");
+// ... use data ...
+cJSON_Delete(data);
+
+// ACAP_VAPIX_Get/Post → char* → free()
+char* response = ACAP_VAPIX_Get("/axis-cgi/param.cgi?action=list");
+// ... use response ...
+free(response);
+
+// cJSON_Print* → char* → free()
+char* json = cJSON_PrintUnformatted(obj);
+LOG("Data: %s\n", json);
+free(json);
+```
+
+## Common Mistake: Leaking Request_Param
+```c
+// WRONG — leaks memory on early return
+char* id = ACAP_HTTP_Request_Param(request, "id");
+if (!id) {
+    ACAP_HTTP_Respond_Error(response, 400, "Missing id");
+    return;  // id is NULL, so no leak here — but watch other params
+}
+char* value = ACAP_HTTP_Request_Param(request, "value");
+if (!value) {
+    free(id);  // Don't forget to free id before early return!
+    ACAP_HTTP_Respond_Error(response, 400, "Missing value");
+    return;
+}
+// ... use id and value ...
+free(id);
+free(value);
+```

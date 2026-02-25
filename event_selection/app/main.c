@@ -231,7 +231,7 @@ int main(void) {
 	LOG("------ Starting ACAP Service ------\n");
 	ACAP_STATUS_SetString("trigger", "status", "Starting");
 
-	ACAP(APP_PACKAGE, Settings_Updated_Callback);
+	ACAP_Init(APP_PACKAGE, Settings_Updated_Callback);
 	ACAP_HTTP_Node("trigger", HTTP_Endpoint_trigger);
 	ACAP_EVENTS_SetCallback(My_Event_Callback);
 

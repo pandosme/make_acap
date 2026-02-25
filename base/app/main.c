@@ -43,15 +43,15 @@ HTTP_Endpoint_fire(const ACAP_HTTP_Response response, const ACAP_HTTP_Request re
 	}
 
 
-    const char* id = ACAP_HTTP_Request_Param(request, "id");
-    const char* value_str = ACAP_HTTP_Request_Param(request, "value");
+    char* id = ACAP_HTTP_Request_Param(request, "id");
+    char* value_str = ACAP_HTTP_Request_Param(request, "value");
     int state = value_str ? atoi(value_str) : 0;
 
 	LOG("Event fired %s %d\n", id ? id : "(null)", state);
 
 	if(!id) {
 		LOG_WARN("%s: Missing event id\n",__func__);
-		free((void*)value_str);
+		free(value_str);
 		ACAP_HTTP_Respond_Error( response, 400, "Missing event ID" );
 		return;
 	}
@@ -72,8 +72,8 @@ HTTP_Endpoint_fire(const ACAP_HTTP_Response response, const ACAP_HTTP_Request re
 		handled = 1;
 	}
 
-	free((void*)id);
-	free((void*)value_str);
+	free(id);
+	free(value_str);
 
 	if(!handled)
 		ACAP_HTTP_Respond_Error( response, 400, "Invalid event ID" );
@@ -92,13 +92,13 @@ HTTP_Endpoint_capture(const ACAP_HTTP_Response response, const ACAP_HTTP_Request
 		return;
 	}
 
-    const char* width_str = ACAP_HTTP_Request_Param(request, "width");
-    const char* height_str = ACAP_HTTP_Request_Param(request, "height");
+    char* width_str = ACAP_HTTP_Request_Param(request, "width");
+    char* height_str = ACAP_HTTP_Request_Param(request, "height");
 
     int width = width_str ? atoi(width_str) : 1920;
     int height = height_str ? atoi(height_str) : 1080;
-    free((void*)width_str);
-    free((void*)height_str);
+    free(width_str);
+    free(height_str);
 	LOG("Image capture %dx%d\n",width,height);
 
     // Create VDO settings for snapshot
@@ -155,7 +155,7 @@ int main(void) {
     openlog(APP_PACKAGE, LOG_PID|LOG_CONS, LOG_USER);
     LOG("------ Starting ACAP Service ------\n");
 
-    ACAP(APP_PACKAGE, Settings_Updated_Callback);
+    ACAP_Init(APP_PACKAGE, Settings_Updated_Callback);
     ACAP_STATUS_SetString("app", "status", "The application is starting");
     ACAP_HTTP_Node("capture", HTTP_Endpoint_capture);
     ACAP_HTTP_Node("fire", HTTP_Endpoint_fire);

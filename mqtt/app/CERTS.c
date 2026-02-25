@@ -104,13 +104,14 @@ CERTS_HTTP (const  ACAP_HTTP_Response response,const  ACAP_HTTP_Request request)
 		 return;
 	}
 
-    // If POST and JSON, parse request->postData
+    // If POST and JSON, parse body via accessor
     cJSON *data = NULL;
     if (method && strcmp(method, "POST") == 0 && contentType &&
         strstr(contentType, "application/json")) {
-        if (request->postData && request->postDataLength > 0) {
+        const char* body = ACAP_HTTP_Get_Body(request);
+        if (body && ACAP_HTTP_Get_Body_Length(request) > 0) {
             // Parse POST body as JSON
-            data = cJSON_Parse(request->postData);
+            data = cJSON_Parse(body);
             if (!data) {
                 ACAP_HTTP_Respond_Error(response, 400, "JSON Parse error");
                 return;
@@ -118,9 +119,10 @@ CERTS_HTTP (const  ACAP_HTTP_Response response,const  ACAP_HTTP_Request request)
         }
     } else {
         // For legacy GET with ?json=..., fall back to query string
-        const char *jsonData = ACAP_HTTP_Request_Param(request, "json");
+        char *jsonData = ACAP_HTTP_Request_Param(request, "json");
         if (jsonData) {
             data = cJSON_Parse(jsonData);
+            free(jsonData);
             if (!data) {
                 ACAP_HTTP_Respond_Error(response, 400, "JSON Parse error");
                 return;

@@ -82,7 +82,7 @@ the APIs are still available.
 ## Code Example
 
 ```c
-void My_Event_Callback(cJSON *event) {
+void My_Event_Callback(cJSON *event, void* userdata) {
     char *json = cJSON_PrintUnformatted(event);
     LOG("%s: %s\n", __func__, json);
     free(json);
@@ -90,13 +90,13 @@ void My_Event_Callback(cJSON *event) {
 
 // Initialize all event subscriptions
 ACAP_EVENTS_SetCallback(My_Event_Callback);
-cJSON *list = ACAP_FILE_Read("localdata/subscriptions.json");
-cJSON *event = list->child;
-while (event) {
-    ACAP_EVENTS_Subscribe(event);
-    event = event->next;
+cJSON *subscriptions = ACAP_FILE_Read("settings/subscriptions.json");
+cJSON *sub = subscriptions ? subscriptions->child : NULL;
+while (sub) {
+    ACAP_EVENTS_Subscribe(sub, NULL);
+    sub = sub->next;
 }
-cJSON_Delete(list);
+// Note: keep subscriptions alive while subscriptions are active
 ```
 
 ## Build
@@ -117,6 +117,7 @@ Install the appropriate EAP file (armv7hf or aarch64) on the Axis device.
 
 | Version | Date | Changes |
 |---------|------|---------|
+| 4.5.0 | 2025 | ACAP.h/ACAP.c v4.0: opaque HTTP types, `ACAP_Init()`, body getters; updated main.c |
 | 4.3.1 | 2025-02-22 | Bumped ACAP.c to v3.6 |
 | 4.3.0 | 2024-12-20 | Added location/VAPIX APIs, removed axParameter references |
 

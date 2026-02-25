@@ -1,0 +1,47 @@
+---
+description: Core ACAP development rules that apply to all files
+globs:
+alwaysApply: true
+---
+
+# ACAP Development Rules
+
+## Protected Files — DO NOT EDIT
+- `ACAP.c`, `ACAP.h`, `cJSON.c`, `cJSON.h` are shared library files
+- These are identical across all templates and must not be modified
+
+## Editable Files
+- `main.c` — application logic
+- `manifest.json` — package identity, HTTP endpoints, permissions
+- `Makefile` — build sources and library dependencies
+- `settings/*.json` — configuration files
+- `html/` — web UI assets
+
+## Naming Requirement
+These three values MUST always match:
+- `PROG1` in Makefile
+- `APP_PACKAGE` in main.c
+- `appName` in manifest.json
+
+## Template Selection
+- `base` — Most projects (UI, image capture, events, settings)
+- `event_subscription` — Static event monitoring via subscriptions.json
+- `event_selection` — Configurable trigger source (user picks event/timer via UI)
+- `mqtt` — MQTT pub/sub services
+
+## API Version
+This project uses ACAP API v4.0:
+- Initialize with `ACAP_Init(APP_PACKAGE, callback)` (not `ACAP()`)
+- HTTP types are opaque — use `ACAP_HTTP_Get_Method()`, `ACAP_HTTP_Get_Body()`, etc.
+- `ACAP_HTTP_Request_Param()` returns `char*` that caller must `free()`
+
+## Build
+```bash
+cd template_dir && ./build.sh
+```
+
+## Reference Documentation
+- `doc/ACAP.md` — Complete API reference with all code patterns
+- `doc/EVENTS.md` — Event catalog (namespaces, properties, state types)
+- `doc/VDO.md` — Video capture API
+- `doc/STORAGE.md` — Edge Storage API (SD card, NAS)
