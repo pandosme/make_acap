@@ -311,6 +311,18 @@ void My_GET_Endpoint(const ACAP_HTTP_Response response, const ACAP_HTTP_Request 
 }
 ```
 
+> **Pitfall — use-after-free with `ACAP_HTTP_Request_Param()`:** Always use the returned string before calling `free()`. The compiler emits a `-Wuse-after-free` warning (treated as an error in strict builds) if `free(param)` is called before the last use of `param`. Check all early-return paths — it's easy to free the pointer on one branch and then reference it on another:
+>
+> ```c
+> /* WRONG — filename is dereferenced after free */
+> free(filename);
+> serve_file(response, filepath, filename);   /* use-after-free */
+>
+> /* CORRECT — free only after the last use */
+> serve_file(response, filepath, filename);
+> free(filename);
+> ```
+
 #### POST JSON Endpoint Example
 
 ```c
@@ -996,12 +1008,19 @@ Apply_Trigger(void) {
 /*
  * Settings update callback.
  * Called by ACAP wrapper when settings are changed via POST /settings.
- * The "settings" service is called last with the complete settings object.
+ *
+ * IMPORTANT: `service` is the INDIVIDUAL PROPERTY NAME (e.g. "triggerType",
+ * "timer"), NOT "settings". ACAP.c calls this once per property in the
+ * POSTed JSON. There is no final call with service="settings".
+ * Match on the specific property names that affect your logic:
  */
 void
 Settings_Updated_Callback(const char* service, cJSON* data) {
+	(void)data;
 	LOG_TRACE("Settings updated: %s\n", service);
-	if (strcmp(service, "settings") == 0) {
+	if (strcmp(service, "triggerType")  == 0 ||
+	    strcmp(service, "triggerEvent") == 0 ||
+	    strcmp(service, "timer")        == 0) {
 		Apply_Trigger();
 	}
 }

@@ -128,12 +128,12 @@ Apply_Trigger(void) {
 	}
 
 	if (strcmp(triggerType, "event") == 0) {
-		cJSON* triggerEvent = cJSON_GetObjectItem(settings, "triggerEvent");
-		if (triggerEvent && !cJSON_IsNull(triggerEvent)) {
-			cJSON* nameItem = cJSON_GetObjectItem(triggerEvent, "name");
+		cJSON* ev = cJSON_GetObjectItem(settings, "event");
+		if (ev && !cJSON_IsNull(ev)) {
+			cJSON* nameItem = cJSON_GetObjectItem(ev, "name");
 			const char* eventName = nameItem ? nameItem->valuestring : "Unknown";
 
-			currentSubscriptionId = ACAP_EVENTS_Subscribe(triggerEvent, NULL);
+			currentSubscriptionId = ACAP_EVENTS_Subscribe(ev, NULL);
 			if (currentSubscriptionId > 0) {
 				LOG("Subscribed to event: %s (id=%d)\n", eventName, currentSubscriptionId);
 				ACAP_STATUS_SetString("trigger", "type", "event");
@@ -169,13 +169,17 @@ Apply_Trigger(void) {
 
 /*
  * Settings update callback.
- * Called by ACAP wrapper when settings are changed via POST /settings.
- * The "settings" service is called last with the complete settings object.
+ * Called by ACAP wrapper once per changed property — `service` is the
+ * property name (e.g. "triggerType", "event", "timer").
+ * There is NO final call with service="settings".
  */
 void
 Settings_Updated_Callback(const char* service, cJSON* data) {
+	(void)data;
 	LOG_TRACE("Settings updated: %s\n", service);
-	if (strcmp(service, "settings") == 0) {
+	if (strcmp(service, "triggerType") == 0 ||
+	    strcmp(service, "event")       == 0 ||
+	    strcmp(service, "timer")       == 0) {
 		Apply_Trigger();
 	}
 }

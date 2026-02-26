@@ -58,3 +58,16 @@ if (!value) {
 free(id);
 free(value);
 ```
+
+## Common Mistake: Use-After-Free With Request_Param
+The cross-compiler treats `-Wuse-after-free` as a hard error. Always `free()` **after** the last use.
+```c
+// WRONG — derefs filename after free
+free(filename);
+serve_file(response, filepath, filename);   /* build error: use-after-free */
+
+// CORRECT — free after the final use
+serve_file(response, filepath, filename);
+free(filename);
+```
+This applies on every code path including early returns.

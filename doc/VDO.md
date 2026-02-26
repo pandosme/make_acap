@@ -6,6 +6,33 @@ Video capture and streaming API for Axis cameras in ACAP applications.
 
 VDO provides access to camera video streams with configurable resolution, format, and framerate. It handles buffer management and delivers frames for processing.
 
+## ⚠ Critical: Do Not Call `vdo_stream_snapshot` from GLib Timer Callbacks
+
+`vdo_stream_snapshot()` is a blocking call that waits for a full video frame. It may internally require GLib main-loop event dispatch to complete. If you call it **directly** from a GLib timer callback (which runs on the main loop), the main loop is blocked while waiting for VDO, which itself needs the main loop — resulting in a silent hang with no image captured.
+
+The function **does work** when called from a non-main-loop context (e.g., a FastCGI handler thread), which is why `Capture Now` buttons work but `g_timeout_add_seconds` timers appear to silently fail.
+
+### Fix: defer via `g_idle_add()`
+
+Never call `vdo_stream_snapshot()` directly from a timer callback. Instead, schedule the capture as a GLib idle source so the timer returns immediately and VDO runs in the next main-loop iteration:
+
+```c
+static gboolean do_capture_idle(gpointer user_data) {
+    (void)user_data;
+    // Safe to call vdo_stream_snapshot() here — main loop is free
+    Capture_Image();
+    return G_SOURCE_REMOVE;   /* run once */
+}
+
+static gboolean Timer_Callback(gpointer user_data) {
+    (void)user_data;
+    g_idle_add(do_capture_idle, NULL);   /* defer; return immediately */
+    return G_SOURCE_CONTINUE;
+}
+```
+
+The same rule applies to any other blocking I/O (large file writes, network requests) called from the GLib main loop.
+
 ## Headers
 
 ```c

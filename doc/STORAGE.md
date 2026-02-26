@@ -56,6 +56,14 @@ PKGS = glib-2.0 gio-2.0 axevent fcgi libcurl axstorage
 #include <axsdk/axstorage.h>
 ```
 
+If you use `access()` or `F_OK` for checking file existence (e.g. checking whether a thumbnail exists), also add:
+
+```c
+#include <unistd.h>   /* access(), F_OK, R_OK, W_OK */
+```
+
+> **Pitfall:** `access()` and `F_OK` are declared in `<unistd.h>`. Omitting this include causes a hard build error (`'F_OK' undeclared`) even though `#include <axsdk/axstorage.h>` is present. The cross-compiler flags `-Wall` escalate the implicit-function-declaration warning to an error.
+
 ***
 
 ## API Overview

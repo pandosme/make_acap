@@ -1,5 +1,5 @@
 {
 	"triggerType": "none",
-	"triggerEvent": null,
+	"event": null,
 	"timer": 60
 }

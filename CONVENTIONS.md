@@ -70,6 +70,14 @@ ACAP_EVENTS_Subscribe(subscription_json, NULL);
 cd template_dir && ./build.sh
 ```
 
+## Known Build Pitfalls
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| `'F_OK' undeclared` in storage/file code | `access()` / `F_OK` require `<unistd.h>` which is not pulled in transitively | Add `#include <unistd.h>` to any `.c` file that uses `access()`, `F_OK`, `R_OK`, `W_OK` |
+| `-Wuse-after-free` build error on HTTP param | `ACAP_HTTP_Request_Param()` returns an allocated `char*`. Calling `free(param)` before the last use (including on early-return paths) causes this error | Always `free()` **after** the final use; audit all code paths |
+| Timer trigger silently fails to capture (VDO deadlock) | `vdo_stream_snapshot()` is blocking and may need the GLib main loop internally. Calling it directly from a `g_timeout_add_seconds` callback (which runs on the main loop) deadlocks silently — no image is captured, no error is logged | Never call `vdo_stream_snapshot()` (or `Capture_Image()`) from a GLib timer callback. Use `g_idle_add(do_capture_idle, NULL)` inside the timer callback to defer the VDO call to the next main-loop iteration || `Settings_Updated` never fires on UI save | `ACAP_UpdateCallback` is called once **per property** with the property name as `service` (e.g. `"triggerType"`, `"timer"`). There is no final call with `service="settings"`. Checking `strcmp(service, "settings")` always fails | Match on the individual property names that affect your logic: `strcmp(service, "triggerType") == 0 \|\| strcmp(service, "timer") == 0` etc. |
+| Object settings (e.g. `triggerEvent`) lost on restart | ACAP.c startup merge cannot restore a `cJSON_Object` whose default in `settings.json` is `null` — it tries to merge sub-keys into the null default, finds none, and the saved value is silently dropped | Add `Restore_Object_Settings()` after `ACAP_Init()`: read `localdata/settings.json` directly with `ACAP_FILE_Read` and call `cJSON_ReplaceItemInObject` for any property that is a `cJSON_Object` in the saved data but `null` in the live config |
 ## Full Reference
 
 - `doc/ACAP.md` — Complete API reference, code patterns, all template main.c sources

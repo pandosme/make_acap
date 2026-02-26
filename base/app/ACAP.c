@@ -126,11 +126,17 @@ cJSON* ACAP_Init(const char* package, ACAP_Config_Update callback) {
             if (cJSON_GetObjectItem(settings, prop->string)) {
                 if (prop->type == cJSON_Object) {
                     cJSON* settingsProp = cJSON_GetObjectItem(settings, prop->string);
-                    cJSON* subprop = prop->child;
-                    while (subprop) {
-                        if (cJSON_GetObjectItem(settingsProp, subprop->string))
-                            cJSON_ReplaceItemInObject(settingsProp, subprop->string, cJSON_Duplicate(subprop, 1));
-                        subprop = subprop->next;
+                    if (!cJSON_IsObject(settingsProp)) {
+                        /* Default is null or non-object — replace entirely */
+                        cJSON_ReplaceItemInObject(settings, prop->string, cJSON_Duplicate(prop, 1));
+                    } else {
+                        /* Default is also an object — merge sub-keys */
+                        cJSON* subprop = prop->child;
+                        while (subprop) {
+                            if (cJSON_GetObjectItem(settingsProp, subprop->string))
+                                cJSON_ReplaceItemInObject(settingsProp, subprop->string, cJSON_Duplicate(subprop, 1));
+                            subprop = subprop->next;
+                        }
                     }
                 } else {
                     cJSON_ReplaceItemInObject(settings, prop->string, cJSON_Duplicate(prop, 1));
