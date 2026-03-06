@@ -572,6 +572,105 @@ Always test for NULL, missing, or invalid values before usage. On error, log wit
 
 ***
 
+## Web UI: Querying Camera Capabilities via VAPIX
+
+When a web UI needs camera-specific data such as supported resolutions, **query the camera's VAPIX API directly from the browser** instead of relying on `ACAP.c` internal VAPIX calls (which may fail on older firmware that lacks internal HTTP request support).
+
+### Supported Resolutions
+
+The camera's supported resolutions are available via the Parameter Management API:
+
+```
+GET /axis-cgi/param.cgi?action=list&group=Properties.Image.Resolution
+```
+
+Response (plain text):
+```
+root.Properties.Image.Resolution=1920x1080,1280x960,1280x720,1024x768,800x600,640x480,640x360,352x240,320x240
+```
+
+This endpoint requires only **Viewer** access and is available on all AXIS OS versions (5.00+).
+
+### JavaScript Example with Fallback
+
+Always include a fallback with common resolutions in case the VAPIX call fails (e.g., network error, proxy restriction):
+
+```javascript
+var DEFAULT_RESOLUTIONS = [
+    "1920x1080", "1280x720", "800x600", "640x480", "320x240"
+];
+
+function loadResolutions(callback) {
+    $.ajax({
+        url: '/axis-cgi/param.cgi?action=list&group=Properties.Image.Resolution',
+        type: 'GET',
+        dataType: 'text',
+        timeout: 5000,
+        success: function(data) {
+            // data = "root.Properties.Image.Resolution=1920x1080,1280x960,..."
+            var parts = data.split('=');
+            if (parts.length === 2) {
+                var resolutions = parts[1].trim().split(',');
+                if (resolutions.length > 0 && resolutions[0]) {
+                    callback(resolutions);
+                    return;
+                }
+            }
+            callback(DEFAULT_RESOLUTIONS);
+        },
+        error: function() {
+            console.warn('VAPIX resolution query failed, using defaults');
+            callback(DEFAULT_RESOLUTIONS);
+        }
+    });
+}
+
+// Usage: populate a <select> element
+loadResolutions(function(resolutions) {
+    var $select = $('#resolution-select');
+    $select.empty().append('<option value="">Default</option>');
+    resolutions.forEach(function(res) {
+        $select.append('<option value="' + res + '">' + res + '</option>');
+    });
+});
+```
+
+### Grouping by Aspect Ratio (Optional)
+
+To group resolutions by aspect ratio (16:9, 4:3, etc.):
+
+```javascript
+function groupByAspectRatio(resolutions) {
+    var groups = {};
+    resolutions.forEach(function(res) {
+        var wh = res.split('x');
+        if (wh.length !== 2) return;
+        var w = parseInt(wh[0]), h = parseInt(wh[1]);
+        var ratio = Math.round(w * 100 / h);
+        var label = ratio === 177 ? '16:9' :
+                    ratio === 133 ? '4:3' :
+                    ratio === 160 ? '16:10' :
+                    ratio === 100 ? '1:1' : 'Other';
+        if (!groups[label]) groups[label] = [];
+        groups[label].push(res);
+    });
+    return groups;
+}
+```
+
+### Other Useful VAPIX Queries from the Web UI
+
+| Data | VAPIX Endpoint | Notes |
+|------|----------------|-------|
+| Supported resolutions | `param.cgi?action=list&group=Properties.Image.Resolution` | Comma-separated list |
+| Supported image formats | `param.cgi?action=list&group=Properties.Image.Format` | jpeg, mjpeg, h264, h265, ... |
+| Current image size | `imagesize.cgi?camera=1` | Returns `image width = N` / `image height = N` |
+| Capture modes | `capturemode.cgi` (POST JSON `{"apiVersion":"1.0","method":"getCaptureModes"}`) | Sensor resolution + max FPS per mode |
+
+> **Why browser-side VAPIX?** The ACAP library (`ACAP.c`) uses internal HTTP calls to the camera's web server. On firmware versions prior to AXIS OS 10.x, these internal calls may not be available or may fail silently. Since the web UI is served to the user's browser, the browser can always reach `/axis-cgi/*` endpoints directly — this works on all firmware versions.
+
+***
+
 ## Best Practices
 
 - **Modify only** needed files: `main.c`, settings, `manifest.json`, HTML, `Makefile`

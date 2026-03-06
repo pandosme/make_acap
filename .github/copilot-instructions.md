@@ -70,6 +70,17 @@ ACAP_EVENTS_Subscribe(subscription_json, NULL);
 cd template_dir && ./build.sh
 ```
 
+## Web UI: Camera Data via VAPIX
+
+When the web UI needs camera-specific data (e.g., supported resolutions), query VAPIX directly from the browser — **do not** rely on `ACAP.c` internal VAPIX calls (they may fail on older firmware). Example:
+```javascript
+// Browser-side: works on all firmware versions
+$.get('/axis-cgi/param.cgi?action=list&group=Properties.Image.Resolution', function(data) {
+    var resolutions = data.split('=')[1].trim().split(',');
+});
+```
+Always include a fallback with default values if the VAPIX call fails. See `doc/ACAP.md` section "Web UI: Querying Camera Capabilities via VAPIX" for full patterns.
+
 ## Full Reference
 
 - `doc/ACAP.md` — Complete API reference, code patterns, all template main.c sources
