@@ -23,8 +23,8 @@
 #ifndef _ACAP_H_
 #define _ACAP_H_
 
-#include <stdio.h>
 #include <glib.h>
+#include "fcgi_stdio.h"
 #include "cJSON.h"
 
 #ifdef __cplusplus
