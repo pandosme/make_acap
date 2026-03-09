@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>SD Card Capture</title>
+	<link rel="stylesheet" href="css/bootstrap.min.css">
+	<link rel="stylesheet" href="css/tom-select.bootstrap5.min.css">
+	<link rel="stylesheet" href="css/app.css">
+	<script src="js/jquery-3.7.1.min.js"></script>
+	<script src="js/bootstrap.bundle.min.js"></script>
+	<script src="js/tom-select.complete.min.js"></script>
+	<script src="js/events.js"></script>
+	<script src="js/toast.js"></script>
+</head>
+<body>
+	<header class="app-header">
+		<div class="app-name" id="app-name">&nbsp;</div>
+		<nav class="nav-bar">
+			<a href="index.html" class="active">Trigger</a>
+			<a href="viewer.html">Viewer</a>
+			<a href="about.html">About</a>
+		</nav>
+	</header>
+
+	<div class="page-content">
+
+		<!-- Trigger Configuration -->
+		<div class="card">
+			<div class="card-header">
+				<h5 class="card-title mb-0">Trigger Configuration</h5>
+			</div>
+			<div class="card-body">
+				<form id="trigger-form">
+					<div class="mb-4">
+						<label class="form-label fw-bold">Trigger Type</label>
+						<div class="btn-group w-100" role="group" style="max-width: 500px;">
+							<input type="radio" class="btn-check" name="triggerType" id="triggerType-none" value="none" checked>
+							<label class="btn btn-outline-secondary" for="triggerType-none">Disabled</label>
+							<input type="radio" class="btn-check" name="triggerType" id="triggerType-event" value="event">
+							<label class="btn btn-outline-primary" for="triggerType-event">Event Based</label>
+							<input type="radio" class="btn-check" name="triggerType" id="triggerType-timer" value="timer">
+							<label class="btn btn-outline-primary" for="triggerType-timer">Timer Based</label>
+						</div>
+					</div>
+
+					<div class="mb-4 d-none" id="event-section">
+						<label class="form-label fw-bold">Event</label>
+						<div style="max-width: 500px;">
+							<select id="trigger-event" placeholder="Select an event..."></select>
+						</div>
+						<small class="text-muted mt-1 d-block">Select a device event to monitor. When this event fires, a JPEG will be captured.</small>
+					</div>
+
+					<div class="mb-4 d-none" id="timer-section">
+						<label class="form-label fw-bold">Timer Interval</label>
+						<div class="input-group" style="max-width: 500px;">
+							<input type="number" class="form-control form-control-lg" id="timer-value" min="1" value="10">
+							<select class="form-select form-select-lg" id="timer-unit" style="max-width: 150px;">
+								<option value="1">Seconds</option>
+								<option value="60" selected>Minutes</option>
+								<option value="3600">Hours</option>
+							</select>
+						</div>
+						<small class="text-muted mt-1 d-block">A JPEG will be captured at this interval.</small>
+					</div>
+
+					<div class="mb-4">
+						<label class="form-label fw-bold">Capture Resolution</label>
+						<div style="max-width: 300px;">
+							<select class="form-select form-select-lg" id="resolution">
+								<option value="">Loading...</option>
+							</select>
+						</div>
+						<small class="text-muted mt-1 d-block">Resolution for captured images. Thumbnails are always 320×180.</small>
+					</div>
+
+					<div class="mt-4">
+						<button type="submit" class="btn btn-primary btn-lg" id="save-btn">Save Configuration</button>
+						<button type="button" class="btn btn-outline-secondary btn-lg ms-2" id="test-btn" style="display:none;">Capture Now</button>
+					</div>
+				</form>
+			</div>
+		</div>
+
+		<!-- Retention Policy -->
+		<div class="card">
+			<div class="card-header">
+				<h5 class="card-title mb-0">Retention Policy</h5>
+			</div>
+			<div class="card-body">
+				<form id="retention-form">
+					<div class="row g-3">
+						<div class="col-md-4">
+							<label class="form-label fw-bold">Max Images</label>
+							<input type="number" class="form-control" id="maxImages" min="1" value="1000">
+							<small class="text-muted">Delete oldest when count exceeds this</small>
+						</div>
+						<div class="col-md-4">
+							<label class="form-label fw-bold">Retention (weeks)</label>
+							<input type="number" class="form-control" id="retentionWeeks" min="1" value="4">
+							<small class="text-muted">Delete images older than this</small>
+						</div>
+						<div class="col-md-4">
+							<label class="form-label fw-bold">Min Free Space (%)</label>
+							<input type="number" class="form-control" id="minFreeSpacePercent" min="1" max="90" value="10">
+							<small class="text-muted">Delete oldest when free space drops below this</small>
+						</div>
+					</div>
+					<div class="mt-3">
+						<button type="submit" class="btn btn-primary" id="retention-save-btn">Save Retention Policy</button>
+					</div>
+				</form>
+			</div>
+		</div>
+
+		<!-- Status -->
+		<div class="card">
+			<div class="card-header d-flex justify-content-between align-items-center">
+				<h5 class="card-title mb-0">Status</h5>
+				<span class="badge" id="status-badge">--</span>
+			</div>
+			<div class="card-body">
+				<div class="row">
+					<div class="col-md-6">
+						<h6>Trigger</h6>
+						<div class="info-grid">
+							<div class="info-row">
+								<div class="info-label">Type:</div>
+								<div class="info-value"><span id="status-type">--</span></div>
+							</div>
+							<div class="info-row" id="status-event-row" style="display:none;">
+								<div class="info-label">Event:</div>
+								<div class="info-value"><span id="status-event">--</span></div>
+							</div>
+							<div class="info-row" id="status-interval-row" style="display:none;">
+								<div class="info-label">Interval:</div>
+								<div class="info-value"><span id="status-interval">--</span></div>
+							</div>
+							<div class="info-row">
+								<div class="info-label">Status:</div>
+								<div class="info-value"><span id="status-status">--</span></div>
+							</div>
+							<div class="info-row">
+								<div class="info-label">Last triggered:</div>
+								<div class="info-value"><span id="status-last">--</span></div>
+							</div>
+						</div>
+					</div>
+					<div class="col-md-6">
+						<h6>Storage</h6>
+						<div class="info-grid">
+							<div class="info-row">
+								<div class="info-label">SD Card:</div>
+								<div class="info-value"><span id="storage-status">--</span></div>
+							</div>
+							<div class="info-row">
+								<div class="info-label">Images:</div>
+								<div class="info-value"><span id="capture-count">--</span></div>
+							</div>
+							<div class="info-row">
+								<div class="info-label">Last capture:</div>
+								<div class="info-value"><span id="capture-last">--</span></div>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+<script>
+var availableEvents = [];
+var eventSelect = null;
+var currentSettings = {};
+
+$(document).ready(function() {
+
+	// Load app info and settings
+	$.ajax({
+		type: 'GET', url: 'app', dataType: 'json', cache: false,
+		success: function(app) {
+			document.title = app.manifest.acapPackageConf.setup.friendlyName;
+			$('#app-name').text(app.manifest.acapPackageConf.setup.friendlyName);
+			currentSettings = app.settings || {};
+			applySettingsToForm(currentSettings);
+			updateTestButton();
+		},
+		error: function(r) { showToast('Failed to load application: ' + r.statusText, 'danger'); }
+	});
+
+	// Load available resolutions directly from VAPIX (browser query — works on all firmware)
+	loadResolutions(function(resolutions) {
+		$('#resolution').empty();
+		resolutions.forEach(function(r) {
+			$('#resolution').append($('<option>').val(r).text(r));
+		});
+		if (currentSettings.resolution) {
+			$('#resolution').val(currentSettings.resolution);
+		}
+	});
+
+	// Initialize TomSelect for event selection
+	eventSelect = new TomSelect(document.getElementById('trigger-event'), {
+		maxItems: 1, valueField: 'name', labelField: 'name', searchField: 'name',
+		options: [], create: false, plugins: ['clear_button']
+	});
+
+	listEvents()
+		.then(function(events) {
+			availableEvents = events;
+			eventSelect.clearOptions();
+			eventSelect.addOption(events);
+			if (currentSettings.triggerType === 'event' &&
+				currentSettings.triggerEvent && currentSettings.triggerEvent.name) {
+				eventSelect.setValue(currentSettings.triggerEvent.name);
+			}
+		})
+		.catch(function() { showToast('Failed to discover device events', 'warning'); });
+
+	$('input[name="triggerType"]').on('change', function() {
+		var type = $('input[name="triggerType"]:checked').val();
+		$('#event-section').toggleClass('d-none', type !== 'event');
+		$('#timer-section').toggleClass('d-none', type !== 'timer');
+		updateTestButton();
+	});
+
+	$('#trigger-form').on('submit', function(e) { e.preventDefault(); saveTriggerConfig(); });
+	$('#retention-form').on('submit', function(e) { e.preventDefault(); saveRetentionConfig(); });
+
+	$('#test-btn').on('click', function() {
+		$.ajax({
+			type: 'POST', url: 'capture',
+			success: function() { showToast('Image captured', 'success'); setTimeout(refreshStatus, 1000); },
+			error: function(r) { showToast('Capture failed: ' + r.statusText, 'danger'); }
+		});
+	});
+
+	refreshStatus();
+	setInterval(refreshStatus, 5000);
+});
+
+function applySettingsToForm(s) {
+	var type = s.triggerType || 'none';
+	$('#triggerType-' + type).prop('checked', true);
+	$('#event-section').toggleClass('d-none', type !== 'event');
+	$('#timer-section').toggleClass('d-none', type !== 'timer');
+
+	if (type === 'event' && s.triggerEvent && s.triggerEvent.name && eventSelect) {
+		eventSelect.setValue(s.triggerEvent.name);
+	}
+	if (s.timer) {
+		var sec = s.timer;
+		if (sec % 3600 === 0 && sec >= 3600) { $('#timer-value').val(sec/3600); $('#timer-unit').val('3600'); }
+		else if (sec % 60 === 0 && sec >= 60) { $('#timer-value').val(sec/60); $('#timer-unit').val('60'); }
+		else { $('#timer-value').val(sec); $('#timer-unit').val('1'); }
+	}
+	if (s.maxImages)           $('#maxImages').val(s.maxImages);
+	if (s.retentionWeeks)      $('#retentionWeeks').val(s.retentionWeeks);
+	if (s.minFreeSpacePercent) $('#minFreeSpacePercent').val(s.minFreeSpacePercent);
+	if (s.resolution)          $('#resolution').val(s.resolution);
+}
+
+function buildTriggerSettings() {
+	var triggerType = $('input[name="triggerType"]:checked').val();
+	var s = {
+		triggerType: triggerType,
+		triggerEvent: null,
+		timer: 60,
+		resolution: $('#resolution').val() || '1920x1080'
+	};
+	if (triggerType === 'event') {
+		var name = $('#trigger-event').val();
+		if (!name) { showToast('Please select an event', 'warning'); return null; }
+		var full = availableEvents.find(function(e) { return e.name === name; });
+		if (full) {
+			var ev = { name: full.name };
+			Object.keys(full).forEach(function(k) { if (k.startsWith('topic')) ev[k] = full[k]; });
+			s.triggerEvent = ev;
+		}
+	} else if (triggerType === 'timer') {
+		var v = parseInt($('#timer-value').val());
+		var u = parseInt($('#timer-unit').val());
+		if (!v || v < 1) { showToast('Please enter a valid interval', 'warning'); return null; }
+		s.timer = v * u;
+	}
+	return s;
+}
+
+function saveTriggerConfig() {
+	var s = buildTriggerSettings();
+	if (!s) return;
+
+	// Merge with retention settings from current
+	s.maxImages           = parseInt($('#maxImages').val()) || currentSettings.maxImages || 1000;
+	s.retentionWeeks      = parseInt($('#retentionWeeks').val()) || currentSettings.retentionWeeks || 4;
+	s.minFreeSpacePercent = parseInt($('#minFreeSpacePercent').val()) || currentSettings.minFreeSpacePercent || 10;
+
+	$('#save-btn').prop('disabled', true).text('Saving...');
+	$.ajax({
+		type: 'POST', url: 'settings', contentType: 'application/json', data: JSON.stringify(s),
+		success: function() {
+			currentSettings = s;
+			showToast('Configuration saved', 'success');
+			$('#save-btn').prop('disabled', false).text('Save Configuration');
+			updateTestButton();
+			setTimeout(refreshStatus, 1000);
+		},
+		error: function(r) {
+			showToast('Failed to save: ' + r.statusText, 'danger');
+			$('#save-btn').prop('disabled', false).text('Save Configuration');
+		}
+	});
+}
+
+function saveRetentionConfig() {
+	var s = $.extend({}, currentSettings, {
+		maxImages:           parseInt($('#maxImages').val()) || 1000,
+		retentionWeeks:      parseInt($('#retentionWeeks').val()) || 4,
+		minFreeSpacePercent: parseInt($('#minFreeSpacePercent').val()) || 10
+	});
+	$('#retention-save-btn').prop('disabled', true).text('Saving...');
+	$.ajax({
+		type: 'POST', url: 'settings', contentType: 'application/json', data: JSON.stringify(s),
+		success: function() {
+			currentSettings = s;
+			showToast('Retention policy saved', 'success');
+			$('#retention-save-btn').prop('disabled', false).text('Save Retention Policy');
+		},
+		error: function(r) {
+			showToast('Failed to save: ' + r.statusText, 'danger');
+			$('#retention-save-btn').prop('disabled', false).text('Save Retention Policy');
+		}
+	});
+}
+
+function updateTestButton() {
+	var type = $('input[name="triggerType"]:checked').val();
+	$('#test-btn').toggle(type !== 'none');
+}
+
+function refreshStatus() {
+	$.ajax({
+		type: 'GET', url: 'status', dataType: 'json', cache: false,
+		success: function(status) {
+			var t = status.trigger || {};
+			$('#status-type').text(t.type || 'none');
+			$('#status-status').text(t.status || '--');
+			$('#status-last').text(t.lastTriggered || 'Never');
+
+			var isActive = t.active;
+			if (isActive === true || isActive === 1) {
+				$('#status-active').html('<span class="badge bg-success">Active</span>');
+			} else {
+				$('#status-active').html('<span class="badge bg-secondary">Inactive</span>');
+			}
+
+			if (t.type === 'event') {
+				$('#status-event-row').show(); $('#status-interval-row').hide();
+				$('#status-event').text(t.event || '--');
+			} else if (t.type === 'timer') {
+				$('#status-event-row').hide(); $('#status-interval-row').show();
+				$('#status-interval').text(formatInterval(t.interval));
+			} else {
+				$('#status-event-row').hide(); $('#status-interval-row').hide();
+			}
+
+			if (t.status === 'Monitoring event' || t.status === 'Timer running') {
+				$('#status-badge').attr('class', 'badge bg-success').text('Running');
+			} else if (t.status === 'Disabled') {
+				$('#status-badge').attr('class', 'badge bg-secondary').text('Disabled');
+			} else {
+				$('#status-badge').attr('class', 'badge bg-warning text-dark').text(t.status || '--');
+			}
+
+			var st = status.storage || {};
+			$('#storage-status').text(st.status || '--');
+
+			var cap = status.capture || {};
+			$('#capture-count').text(cap.imageCount !== undefined ? cap.imageCount + ' images' : '--');
+			$('#capture-last').text(cap.lastCapture || '--');
+		}
+	});
+}
+
+function formatInterval(seconds) {
+	if (!seconds) return '--';
+	if (seconds >= 3600 && seconds % 3600 === 0) return (seconds / 3600) + ' hour(s)';
+	if (seconds >= 60   && seconds % 60   === 0) return (seconds / 60)   + ' minute(s)';
+	return seconds + ' second(s)';
+}
+
+function loadResolutions(callback) {
+	var defaults = ['1920x1080', '1280x720', '800x600', '640x480', '320x240'];
+	$.ajax({
+		url: '/axis-cgi/param.cgi?action=list&group=Properties.Image.Resolution',
+		type: 'GET', dataType: 'text', timeout: 5000,
+		success: function(data) {
+			var parts = data.split('=');
+			if (parts.length >= 2) {
+				var resolutions = parts[1].trim().split(',').map(function(r) { return r.trim(); }).filter(Boolean);
+				if (resolutions.length > 0) { callback(resolutions); return; }
+			}
+			callback(defaults);
+		},
+		error: function() { callback(defaults); }
+	});
+}
+</script>
+</body>
+</html>

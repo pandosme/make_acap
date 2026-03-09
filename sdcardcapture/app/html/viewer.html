@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>SD Card Capture — Viewer</title>
+	<link rel="stylesheet" href="css/bootstrap.min.css">
+	<link rel="stylesheet" href="css/app.css">
+	<script src="js/jquery-3.7.1.min.js"></script>
+	<script src="js/bootstrap.bundle.min.js"></script>
+	<script src="js/toast.js"></script>
+	<style>
+		.thumb-grid {
+			display: grid;
+			grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+			gap: 12px;
+			padding: 4px;
+		}
+		.thumb-item {
+			position: relative;
+			border-radius: 6px;
+			overflow: hidden;
+			background: #1a1a2e;
+			cursor: pointer;
+			border: 3px solid transparent;
+			transition: border-color 0.15s, box-shadow 0.15s;
+		}
+		.thumb-item:hover {
+			border-color: #2d4a9e;
+			box-shadow: 0 2px 8px rgba(45,74,158,0.4);
+		}
+		.thumb-item.selected {
+			border-color: #2d4a9e;
+			box-shadow: 0 0 0 3px rgba(45,74,158,0.5);
+		}
+		.thumb-item img {
+			width: 100%;
+			height: 120px;
+			object-fit: cover;
+			display: block;
+		}
+		.thumb-item .thumb-label {
+			padding: 5px 7px;
+			font-size: 0.72rem;
+			color: #ccc;
+			background: #1a1a2e;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+		.thumb-item .thumb-check {
+			position: absolute;
+			top: 6px;
+			left: 6px;
+			width: 20px;
+			height: 20px;
+			border-radius: 4px;
+			background: rgba(0,0,0,0.55);
+			border: 2px solid #fff;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+			font-size: 13px;
+			color: #fff;
+			transition: background 0.15s;
+		}
+		.thumb-item.selected .thumb-check {
+			background: #2d4a9e;
+		}
+		.thumb-item .thumb-open {
+			position: absolute;
+			top: 6px;
+			right: 6px;
+			background: rgba(0,0,0,0.55);
+			border-radius: 4px;
+			padding: 2px 5px;
+			font-size: 11px;
+			color: #fff;
+			text-decoration: none;
+			opacity: 0;
+			transition: opacity 0.15s;
+		}
+		.thumb-item:hover .thumb-open { opacity: 1; }
+
+		.viewer-toolbar {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 8px;
+			align-items: center;
+			margin-bottom: 12px;
+		}
+		.selection-count {
+			margin-left: auto;
+			font-size: 0.9rem;
+			color: #6c757d;
+		}
+		#lightbox-modal .modal-body {
+			background: #000;
+			padding: 0;
+			text-align: center;
+		}
+		#lightbox-modal img {
+			max-width: 100%;
+			max-height: 80vh;
+		}
+	</style>
+</head>
+<body>
+	<header class="app-header">
+		<div class="app-name" id="app-name">&nbsp;</div>
+		<nav class="nav-bar">
+			<a href="index.html">Trigger</a>
+			<a href="viewer.html" class="active">Viewer</a>
+			<a href="about.html">About</a>
+		</nav>
+	</header>
+
+	<div class="page-content">
+		<div class="card">
+			<div class="card-header d-flex justify-content-between align-items-center">
+				<h5 class="card-title mb-0">Captured Images</h5>
+				<div>
+					<span class="badge bg-secondary me-1" id="total-count">0 images</span>
+					<span class="badge" id="sd-status">SD: --</span>
+				</div>
+			</div>
+			<div class="card-body">
+				<div class="viewer-toolbar">
+					<button class="btn btn-sm btn-outline-secondary" id="select-all-btn">Select All</button>
+					<button class="btn btn-sm btn-outline-secondary" id="deselect-all-btn">Deselect All</button>
+					<button class="btn btn-sm btn-danger" id="delete-btn" disabled>Delete Selected</button>
+					<button class="btn btn-sm btn-primary" id="download-btn" disabled>Download ZIP</button>
+					<button class="btn btn-sm btn-outline-secondary" id="refresh-btn">Refresh</button>
+					<span class="selection-count" id="selection-count"></span>
+				</div>
+
+				<div id="thumb-grid" class="thumb-grid">
+					<div class="text-muted p-4" id="empty-msg">Loading images...</div>
+				</div>
+
+				<div class="d-flex justify-content-center mt-3" id="load-more-wrap" style="display:none!important;">
+					<button class="btn btn-outline-secondary" id="load-more-btn">Load More</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<!-- Lightbox modal -->
+	<div class="modal fade" id="lightbox-modal" tabindex="-1">
+		<div class="modal-dialog modal-xl modal-dialog-centered">
+			<div class="modal-content">
+				<div class="modal-header">
+					<h6 class="modal-title" id="lightbox-title"></h6>
+					<button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+				</div>
+				<div class="modal-body">
+					<img id="lightbox-img" src="" alt="">
+				</div>
+				<div class="modal-footer">
+					<a id="lightbox-download" href="" download class="btn btn-primary btn-sm">Download</a>
+					<button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+				</div>
+			</div>
+		</div>
+	</div>
+
+<script>
+var allImages = [];
+var selected = new Set();
+var PAGE_SIZE = 60;
+var displayedCount = 0;
+
+$(document).ready(function() {
+	$.ajax({
+		type: 'GET', url: 'app', dataType: 'json', cache: false,
+		success: function(app) {
+			document.title = app.manifest.acapPackageConf.setup.friendlyName + ' — Viewer';
+			$('#app-name').text(app.manifest.acapPackageConf.setup.friendlyName);
+		}
+	});
+
+	loadImages();
+
+	$('#select-all-btn').on('click', function() {
+		allImages.forEach(function(img) { selected.add(img.filename); });
+		$('.thumb-item').addClass('selected').find('.thumb-check').html('&#10003;');
+		updateSelectionUI();
+	});
+
+	$('#deselect-all-btn').on('click', function() {
+		selected.clear();
+		$('.thumb-item').removeClass('selected').find('.thumb-check').html('');
+		updateSelectionUI();
+	});
+
+	$('#delete-btn').on('click', function() {
+		if (selected.size === 0) return;
+		if (!confirm('Delete ' + selected.size + ' image(s)? This cannot be undone.')) return;
+		deleteSelected();
+	});
+
+	$('#download-btn').on('click', function() {
+		if (selected.size === 0) return;
+		downloadSelected();
+	});
+
+	$('#refresh-btn').on('click', function() {
+		selected.clear();
+		loadImages();
+	});
+
+	$('#load-more-btn').on('click', function() {
+		renderBatch();
+	});
+});
+
+function loadImages() {
+	$('#empty-msg').text('Loading images...').show();
+	$('#thumb-grid').empty().append($('#empty-msg'));
+	displayedCount = 0;
+
+	$.ajax({
+		type: 'GET', url: 'images?list=1', dataType: 'json', cache: false,
+		success: function(images) {
+			allImages = images;
+			$('#total-count').text(images.length + ' image' + (images.length !== 1 ? 's' : ''));
+			selected.clear();
+			updateSelectionUI();
+
+			if (images.length === 0) {
+				$('#empty-msg').text('No images captured yet.').show();
+				$('#load-more-wrap').hide();
+				return;
+			}
+			$('#empty-msg').hide().detach();
+			$('#thumb-grid').empty();
+			renderBatch();
+		},
+		error: function() {
+			$('#empty-msg').text('Failed to load images.').show();
+		}
+	});
+
+	// Update SD status
+	$.ajax({
+		type: 'GET', url: 'status', dataType: 'json', cache: false,
+		success: function(s) {
+			var st = (s.storage && s.storage.status) || '--';
+			var cls = st === 'Ready' ? 'bg-success' : 'bg-warning text-dark';
+			$('#sd-status').attr('class', 'badge ' + cls).text('SD: ' + st);
+		}
+	});
+}
+
+function renderBatch() {
+	var batch = allImages.slice(displayedCount, displayedCount + PAGE_SIZE);
+	batch.forEach(function(img) {
+		var item = createThumbItem(img);
+		$('#thumb-grid').append(item);
+	});
+	displayedCount += batch.length;
+
+	if (displayedCount < allImages.length) {
+		$('#load-more-wrap').show();
+	} else {
+		$('#load-more-wrap').hide();
+	}
+}
+
+function createThumbItem(img) {
+	var isSelected = selected.has(img.filename);
+	var item = $('<div class="thumb-item' + (isSelected ? ' selected' : '') + '"></div>');
+	item.attr('data-filename', img.filename);
+
+	var check = $('<div class="thumb-check"></div>').html(isSelected ? '&#10003;' : '');
+	var image = $('<img loading="lazy">').attr('src', 'images?thumb=' + encodeURIComponent(img.filename));
+	image.on('error', function() { $(this).attr('src', 'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" width="180" height="120"><rect width="180" height="120" fill="%23333"/><text x="50%" y="50%" fill="%23888" text-anchor="middle" dy=".3em">No preview</text></svg>'); });
+
+	var label = $('<div class="thumb-label"></div>').text(img.timestamp || img.filename);
+	var openBtn = $('<a class="thumb-open" target="_blank">&#128269;</a>')
+		.attr('href', 'images?file=' + encodeURIComponent(img.filename))
+		.on('click', function(e) { e.stopPropagation(); openLightbox(img); });
+
+	item.append(check, image, label, openBtn);
+
+	item.on('click', function() { toggleSelect(img.filename, item); });
+
+	return item;
+}
+
+function toggleSelect(filename, item) {
+	if (selected.has(filename)) {
+		selected.delete(filename);
+		item.removeClass('selected').find('.thumb-check').html('');
+	} else {
+		selected.add(filename);
+		item.addClass('selected').find('.thumb-check').html('&#10003;');
+	}
+	updateSelectionUI();
+}
+
+function updateSelectionUI() {
+	var n = selected.size;
+	$('#selection-count').text(n > 0 ? n + ' selected' : '');
+	$('#delete-btn').prop('disabled', n === 0);
+	$('#download-btn').prop('disabled', n === 0);
+}
+
+function deleteSelected() {
+	var files = Array.from(selected);
+	$.ajax({
+		type: 'POST', url: 'images',
+		contentType: 'application/json',
+		data: JSON.stringify({ delete: files }),
+		success: function(result) {
+			showToast('Deleted ' + (result.deleted || files.length) + ' image(s)', 'success');
+			selected.clear();
+			loadImages();
+		},
+		error: function(r) { showToast('Delete failed: ' + r.statusText, 'danger'); }
+	});
+}
+
+function downloadSelected() {
+	var files = Array.from(selected);
+	// POST to export endpoint with file list
+	var form = document.createElement('form');
+	form.method = 'POST';
+	form.action = 'export';
+	form.style.display = 'none';
+
+	// Use fetch instead of form so we can send JSON
+	fetch('export', {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ files: files, delete: 0 })
+	})
+	.then(function(resp) {
+		if (!resp.ok) throw new Error('Export failed');
+		return resp.blob();
+	})
+	.then(function(blob) {
+		var url  = URL.createObjectURL(blob);
+		var a    = document.createElement('a');
+		a.href   = url;
+		a.download = 'sdcardcapture_export.zip';
+		document.body.appendChild(a);
+		a.click();
+		document.body.removeChild(a);
+		URL.revokeObjectURL(url);
+	})
+	.catch(function(err) { showToast('Download failed: ' + err.message, 'danger'); });
+}
+
+function openLightbox(img) {
+	var url = 'images?file=' + encodeURIComponent(img.filename);
+	$('#lightbox-img').attr('src', url);
+	$('#lightbox-title').text(img.timestamp || img.filename);
+	$('#lightbox-download').attr('href', url).attr('download', img.filename);
+	var modal = new bootstrap.Modal(document.getElementById('lightbox-modal'));
+	modal.show();
+}
+</script>
+</body>
+</html>

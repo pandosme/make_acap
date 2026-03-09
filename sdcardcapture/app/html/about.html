@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title></title>
+	<link rel="stylesheet" href="css/bootstrap.min.css">
+	<link rel="stylesheet" href="css/app.css">
+	<script src="js/jquery-3.7.1.min.js"></script>
+	<script src="js/bootstrap.bundle.min.js"></script>
+	<script src="js/toast.js"></script>
+</head>
+<body>
+	<header class="app-header">
+		<div class="app-name" id="app-name">&nbsp;</div>
+		<nav class="nav-bar">
+			<a href="index.html">Trigger</a>
+			<a href="viewer.html">Viewer</a>
+			<a href="about.html" class="active">About</a>
+		</nav>
+	</header>
+
+	<div class="page-content">
+		<h2>Application</h2>
+		<div class="info-grid">
+			<div class="info-row">
+				<div class="info-label">Name:</div>
+				<div class="info-value"><span id="name"></span></div>
+			</div>
+			<div class="info-row">
+				<div class="info-label">Package:</div>
+				<div class="info-value"><span id="package"></span></div>
+			</div>
+			<div class="info-row">
+				<div class="info-label">Version:</div>
+				<div class="info-value"><span id="version"></span></div>
+			</div>
+			<div class="info-row">
+				<div class="info-label">Vendor:</div>
+				<div class="info-value"><span id="vendor"></span></div>
+			</div>
+			<div class="info-row">
+				<div class="info-label">URL:</div>
+				<div class="info-value">
+					<a id="vendorLink" href="" target="_blank"><span id="url"></span></a>
+				</div>
+			</div>
+			<div class="info-row">
+				<div class="info-label">Device:</div>
+				<div class="info-value"><span id="model"></span></div>
+			</div>
+			<div class="info-row">
+				<div class="info-label">Firmware:</div>
+				<div class="info-value"><span id="firmware"></span></div>
+			</div>
+			<div class="info-row">
+				<div class="info-label">Serial:</div>
+				<div class="info-value"><span id="serial"></span></div>
+			</div>
+			<div class="info-row">
+				<div class="info-label">Chip:</div>
+				<div class="info-value"><span id="chip"></span></div>
+			</div>
+			<div class="info-row">
+				<div class="info-label">Architecture:</div>
+				<div class="info-value"><span id="arch"></span></div>
+			</div>
+		</div>
+
+		<h2 class="mt-4">Export API</h2>
+		<p class="text-muted">Use these endpoints to integrate with external systems:</p>
+		<div class="info-grid">
+			<div class="info-row">
+				<div class="info-label" style="min-width:200px;">List images:</div>
+				<div class="info-value"><code>GET /local/sdcardcapture/images?list</code></div>
+			</div>
+			<div class="info-row">
+				<div class="info-label" style="min-width:200px;">Get image:</div>
+				<div class="info-value"><code>GET /local/sdcardcapture/images?file=YYYYMMDDTHHmmss.jpg</code></div>
+			</div>
+			<div class="info-row">
+				<div class="info-label" style="min-width:200px;">Date-range export:</div>
+				<div class="info-value"><code>GET /local/sdcardcapture/export?from=20260101T000000&amp;to=20261231T235959&amp;delete=0</code></div>
+			</div>
+			<div class="info-row">
+				<div class="info-label" style="min-width:200px;">Manual capture:</div>
+				<div class="info-value"><code>POST /local/sdcardcapture/capture</code></div>
+			</div>
+		</div>
+	</div>
+
+<script>
+$(document).ready(function() {
+	$.ajax({
+		type: 'GET', url: 'app', dataType: 'json', cache: false,
+		success: function(app) {
+			var setup = app.manifest.acapPackageConf.setup;
+			document.title = setup.friendlyName + ' — About';
+			$('#app-name').text(setup.friendlyName);
+			$('#name').text(setup.friendlyName);
+			$('#package').text(setup.appName);
+			$('#version').text(setup.version);
+			$('#vendor').text(setup.vendor);
+			$('#url').text(setup.vendorUrl);
+			$('#vendorLink').attr('href', setup.vendorUrl);
+		},
+		error: function(r) { showToast('Failed to load application: ' + r.statusText, 'danger'); }
+	});
+
+	$.ajax({
+		type: 'POST',
+		url: '/axis-cgi/basicdeviceinfo.cgi',
+		data: '{"apiVersion": "1.0","context": "acap","method": "getAllProperties"}',
+		contentType: 'application/json',
+		dataType: 'json',
+		cache: false,
+		success: function(info) {
+			var p = info.data.propertyList;
+			$('#model').text(p.ProdShortName);
+			$('#firmware').text(p.Version);
+			$('#serial').text(p.SerialNumber);
+			$('#chip').text(p.Soc);
+			$('#arch').text(p.Architecture);
+		},
+		error: function(r) { showToast('Failed to load device info: ' + r.statusText, 'danger'); }
+	});
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+    "triggerType": "none",
+    "triggerEvent": null,
+    "timer": 60,
+    "resolution": "1920x1080",
+    "maxImages": 1000,
+    "retentionWeeks": 4,
+    "minFreeSpacePercent": 10
+}

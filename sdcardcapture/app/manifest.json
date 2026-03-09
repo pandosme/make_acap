@@ -1,0 +1,38 @@
+{
+    "schemaVersion": "1.7.1",
+    "acapPackageConf": {
+        "setup": {
+            "friendlyName": "SD Card Capture",
+            "appName": "sdcardcapture",
+            "vendor": "Fred Juhlin",
+            "embeddedSdkVersion": "3.0",
+            "vendorUrl": "https://pandosme.github.io",
+            "runMode": "once",
+            "version": "1.0.0"
+        },
+        "configuration": {
+            "settingPage": "index.html",
+            "httpConfig": [
+                {"name": "app",     "access": "admin", "type": "fastCgi"},
+                {"name": "settings","access": "admin", "type": "fastCgi"},
+                {"name": "status",  "access": "admin", "type": "fastCgi"},
+                {"name": "trigger", "access": "admin", "type": "fastCgi"},
+                {"name": "capture", "access": "admin", "type": "fastCgi"},
+                {"name": "images",  "access": "admin", "type": "fastCgi"},
+                {"name": "export",  "access": "admin", "type": "fastCgi"}
+            ]
+        }
+    },
+    "resources": {
+        "linux": {
+            "user": {
+                "groups": ["storage"]
+            }
+        },
+        "dbus": {
+            "requiredMethods": [
+                "com.axis.HTTPConf1.VAPIXServiceAccounts1.GetCredentials"
+            ]
+        }
+    }
+}

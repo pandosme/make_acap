@@ -1,0 +1,4 @@
+[
+    { "id": "state",   "name": "SD Card Capture: State",   "state": true,  "show": true, "data": [] },
+    { "id": "trigger", "name": "SD Card Capture: Trigger", "state": false, "show": true, "data": [] }
+]
