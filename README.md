@@ -78,6 +78,7 @@ These three values **must always match**:
 | `event_subscription` | Static event monitoring (topics defined in `subscriptions.json`) |
 | `event_selection` | User-configurable trigger source (event or timer, picked via UI) |
 | `mqtt` | MQTT broker connectivity, publish/subscribe |
+| `thermometry` | Thermal camera — poll temperature areas/spot meter and forward alarms via MQTT |
 
 ### API Quick Reference (v4.0)
 
@@ -120,7 +121,7 @@ Add the `.c` file to `OBJS1` in `Makefile`. Add any new library to `PKGS`.
 The build uses Docker with the Axis ACAP Native SDK 12.2.0. The `build.sh` script builds packages for both aarch64 and armv7hf architectures.
 
 ```bash
-cd base  # or event_subscription, event_selection, mqtt
+cd base  # or event_subscription, event_selection, mqtt, thermometry
 ./build.sh
 ```
 

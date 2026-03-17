@@ -1,0 +1,7 @@
+{
+	"pollInterval": 10,
+	"publishAreas": true,
+	"publishSpot": true,
+	"publishEvents": true,
+	"temperatureScale": "celsius"
+}

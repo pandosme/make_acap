@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title></title>
+	<link rel="stylesheet" href="css/bootstrap.min.css">
+	<link rel="stylesheet" href="css/app.css">
+	<script src="js/jquery-3.7.1.min.js"></script>
+	<script src="js/bootstrap.bundle.min.js"></script>
+	<script src="js/toast.js"></script>
+</head>
+<body>
+	<header class="app-header">
+		<div class="app-name" id="app-name">&nbsp;</div>
+		<nav class="nav-bar">
+			<a href="index.html" class="active">Thermal</a>
+			<a href="mqtt.html">MQTT</a>
+			<a href="about.html">About</a>
+		</nav>
+	</header>
+
+	<div class="page-content">
+		<div class="row">
+			<!-- Settings Card -->
+			<div class="col-xxl-4 col-xl-6 mb-4">
+				<div class="card">
+					<div class="card-body">
+						<h3 class="card-title">Settings</h3>
+
+						<div class="form-group">
+							<label for="pollInterval">Poll Interval (s)</label>
+							<input id="pollInterval" type="number" min="5" step="1" class="form-control">
+						</div>
+
+						<div class="form-group">
+							<label for="temperatureScale">Temp. Scale</label>
+							<select id="temperatureScale" class="form-control">
+								<option value="celsius">Celsius</option>
+								<option value="fahrenheit">Fahrenheit</option>
+							</select>
+						</div>
+
+						<div class="form-group">
+							<label for="publishAreas">Publish Areas</label>
+							<select id="publishAreas" class="form-control">
+								<option value="true">Enabled</option>
+								<option value="false">Disabled</option>
+							</select>
+						</div>
+
+						<div class="form-group">
+							<label for="publishSpot">Publish Spot</label>
+							<select id="publishSpot" class="form-control">
+								<option value="true">Enabled</option>
+								<option value="false">Disabled</option>
+							</select>
+						</div>
+
+						<div class="form-group">
+							<label for="publishEvents">Publish Events</label>
+							<select id="publishEvents" class="form-control">
+								<option value="true">Enabled</option>
+								<option value="false">Disabled</option>
+							</select>
+						</div>
+
+						<div class="form-group">
+							<div class="button-container">
+								<button id="saveSettings" class="btn btn-primary">Save</button>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+
+			<!-- Live Status Card -->
+			<div class="col-xxl-8 col-xl-6 mb-4">
+				<div class="card">
+					<div class="card-body">
+						<h3 class="card-title">Live Temperature Status</h3>
+						<div class="info-grid">
+							<div class="info-row">
+								<div class="info-label">MQTT:</div>
+								<div class="info-value"><span id="mqtt_status">--</span></div>
+							</div>
+							<div class="info-row">
+								<div class="info-label">Scale:</div>
+								<div class="info-value"><span id="status_scale">--</span></div>
+							</div>
+							<div class="info-row">
+								<div class="info-label">Poll Interval:</div>
+								<div class="info-value"><span id="status_interval">--</span> seconds</div>
+							</div>
+							<div class="info-row">
+								<div class="info-label">Spot Temp:</div>
+								<div class="info-value"><span id="status_spot" class="temp-value">--</span></div>
+							</div>
+						</div>
+
+						<h5 class="mt-4 mb-3" style="color:#1a2a6c;">Temperature Areas</h5>
+						<div class="table-responsive">
+							<table class="table table-sm table-striped" id="areasTable">
+								<thead>
+									<tr>
+										<th>ID</th>
+										<th>Avg</th>
+										<th>Min</th>
+										<th>Max</th>
+										<th>Triggered</th>
+									</tr>
+								</thead>
+								<tbody id="areasBody">
+									<tr><td colspan="5" class="text-muted">Waiting for data...</td></tr>
+								</tbody>
+							</table>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Event Subscriptions Card -->
+		<div class="row">
+			<div class="col-12 mb-4">
+				<div class="card">
+					<div class="card-body">
+						<h3 class="card-title">Event Subscriptions</h3>
+						<p class="text-muted">These camera events are monitored and published to MQTT when triggered.</p>
+						<div class="table-responsive">
+							<table class="table table-sm">
+								<thead>
+									<tr><th>Event Name</th><th>Topic</th></tr>
+								</thead>
+								<tbody id="subscriptionsBody">
+								</tbody>
+							</table>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+<script>
+$(document).ready(function() {
+	// Load app info
+	$.ajax({
+		type: "GET",
+		url: 'app',
+		dataType: 'json',
+		cache: false,
+		success: function(app) {
+			document.title = app.manifest.acapPackageConf.setup.friendlyName;
+			$('#app-name').text(app.manifest.acapPackageConf.setup.friendlyName);
+
+			// Load settings
+			var s = app.settings || {};
+			$('#pollInterval').val(s.pollInterval || 10);
+			$('#temperatureScale').val(s.temperatureScale || 'celsius');
+			$('#publishAreas').val(String(s.publishAreas !== false));
+			$('#publishSpot').val(String(s.publishSpot !== false));
+			$('#publishEvents').val(String(s.publishEvents !== false));
+
+			// Load subscriptions info
+			loadSubscriptions();
+		},
+		error: function(response) {
+			showToast("The application is not running", 'danger');
+		}
+	});
+
+	// Poll status
+	setInterval(updateStatus, 5000);
+	updateStatus();
+});
+
+function updateStatus() {
+	$.ajax({
+		type: "GET",
+		url: 'status',
+		dataType: 'json',
+		cache: false,
+		success: function(status) {
+			if (status.mqtt) {
+				$('#mqtt_status').text(status.mqtt.status || '--');
+				if (status.mqtt.connected) {
+					$('#mqtt_status').removeClass('text-danger').addClass('text-success');
+				} else {
+					$('#mqtt_status').removeClass('text-success').addClass('text-danger');
+				}
+			}
+			if (status.thermometry) {
+				var t = status.thermometry;
+				$('#status_scale').text(t.scale || '--');
+				$('#status_interval').text(t.pollInterval || '--');
+
+				if (t.spotTemperature != null) {
+					var unit = (t.scale === 'fahrenheit') ? '°F' : '°C';
+					$('#status_spot').text(t.spotTemperature + unit);
+				} else {
+					$('#status_spot').text('No spot meter');
+				}
+
+				if (t.areas && t.areas.length > 0) {
+					var unit = (t.scale === 'fahrenheit') ? '°F' : '°C';
+					var html = '';
+					t.areas.forEach(function(area) {
+						var triggered = area.triggered ?
+							'<span class="badge bg-danger">ALARM</span>' :
+							'<span class="badge bg-success">OK</span>';
+						html += '<tr>' +
+							'<td>' + area.id + '</td>' +
+							'<td>' + area.avg + unit + '</td>' +
+							'<td>' + area.min + unit + '</td>' +
+							'<td>' + area.max + unit + '</td>' +
+							'<td>' + triggered + '</td>' +
+							'</tr>';
+					});
+					$('#areasBody').html(html);
+				} else {
+					$('#areasBody').html('<tr><td colspan="5" class="text-muted">No areas configured on camera</td></tr>');
+				}
+			}
+		},
+		error: function() {}
+	});
+}
+
+function loadSubscriptions() {
+	// Show the hardcoded subscription names from the known config
+	var subs = [
+		{name: "Temperature Area Alarm", topic: "tns1:VideoSource/tns1:RadiometryAlarm/tnsaxis:TemperatureDetection"},
+		{name: "Temperature Info (30s)", topic: "tns1:VideoSource/tns1:Thermometry/tnsaxis:TemperatureDetection"},
+		{name: "Temperature Deviation Alarm", topic: "tns1:VideoSource/tns1:RadiometryAlarm/tnsaxis:DeviationDetection"}
+	];
+	var html = '';
+	subs.forEach(function(s) {
+		html += '<tr><td>' + s.name + '</td><td><code>' + s.topic + '</code></td></tr>';
+	});
+	$('#subscriptionsBody').html(html);
+}
+
+$('#saveSettings').click(function() {
+	var interval = parseInt($('#pollInterval').val());
+	if (interval < 5) {
+		showToast("Minimum poll interval is 5 seconds", 'warning');
+		$('#pollInterval').val(5);
+		return;
+	}
+	var settings = {
+		pollInterval: interval,
+		temperatureScale: $('#temperatureScale').val(),
+		publishAreas: $('#publishAreas').val() === 'true',
+		publishSpot: $('#publishSpot').val() === 'true',
+		publishEvents: $('#publishEvents').val() === 'true'
+	};
+	$.ajax({
+		type: "POST",
+		url: 'settings',
+		data: JSON.stringify(settings),
+		contentType: 'application/json',
+		dataType: 'text',
+		success: function() {
+			showToast("Settings saved", 'success');
+		},
+		error: function(response) {
+			showToast("Failed to save settings: " + response.statusText, 'danger');
+		}
+	});
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+[
+	{
+		"name": "Temperature Area Alarm",
+		"topic0": {"tns1":"VideoSource"},
+		"topic1": {"tns1":"RadiometryAlarm"},
+		"topic2": {"tnsaxis":"TemperatureDetection"}
+	},
+	{
+		"name": "Temperature Info",
+		"topic0": {"tns1":"VideoSource"},
+		"topic1": {"tns1":"Thermometry"},
+		"topic2": {"tnsaxis":"TemperatureDetection"}
+	},
+	{
+		"name": "Temperature Deviation Alarm",
+		"topic0": {"tns1":"VideoSource"},
+		"topic1": {"tns1":"RadiometryAlarm"},
+		"topic2": {"tnsaxis":"DeviationDetection"}
+	}
+]

@@ -1,0 +1,7 @@
+[
+	{
+		"id": "temperature_alarm",
+		"name": "Temperature Alarm",
+		"state": true
+	}
+]
